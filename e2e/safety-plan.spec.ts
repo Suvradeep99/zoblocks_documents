@@ -59,17 +59,42 @@ test.describe("@a11y safety plan", () => {
     const trigger = crisisStep.getByRole("button");
     await expect(trigger).toHaveAttribute("aria-disabled", "true");
 
-    // A pinned crisis section must remain available even when activated.
-    await trigger.click();
+    // The pinned crisis section stays open and cannot be collapsed.
+    await expect(trigger).toBeDisabled();
     await expect(crisisStep).toHaveAttribute("data-open", "true");
   });
 
   test("identifies incomplete steps instead of leaving them blank", async ({ page }) => {
     const plan = await openSafetyPlan(page, "Unfinished");
 
-    await expect(plan).toContainText("Sleeping less than four hours");
-    await expect(plan).toContainText("988");
-    await expect(plan).toContainText("Not filled in yet. You can add to this with your clinician.");
+    const warningSigns = plan
+      .locator(".zb-accordion__item")
+      .filter({
+        has: page.getByRole("button", {
+          name: /Signs that things are getting harder/,
+        }),
+      })
+      .first();
+
+    await warningSigns.getByRole("button").click();
+    await expect(warningSigns).toContainText("Sleeping less than four hours");
+
+    const crisisStep = plan.locator('[data-pinned="true"]');
+    await expect(crisisStep).toContainText("988");
+
+    const internalCoping = plan
+      .locator(".zb-accordion__item")
+      .filter({
+        has: page.getByRole("button", {
+          name: /Things I can do on my own/,
+        }),
+      })
+      .first();
+
+    await internalCoping.getByRole("button").click();
+    await expect(internalCoping).toContainText(
+      "Not filled in yet. You can add to this with your clinician.",
+    );
   });
 
   test("allows an ordinary step to expand and collapse", async ({ page }) => {
