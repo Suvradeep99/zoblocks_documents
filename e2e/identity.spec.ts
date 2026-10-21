@@ -5,11 +5,16 @@ const PAGE = "/components/identity";
 async function openIdentity(page: Page) {
   await page.goto(PAGE);
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("tablist")).toBeVisible();
+
+  await expect(page.getByRole("tablist", { name: "identity states" })).toBeVisible();
 }
 
 async function selectScenario(page: Page, label: string) {
-  await page.getByRole("tab", { name: label }).click();
+  const scenarioTabs = page.getByRole("tablist", {
+    name: "identity states",
+  });
+
+  await scenarioTabs.getByRole("tab", { name: label }).click();
   await expect(page.getByRole("tabpanel")).toBeVisible();
 }
 
