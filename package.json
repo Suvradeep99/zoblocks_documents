@@ -128,7 +128,13 @@
       "vite@>=8.2.0 <=8.2.3": ">=8.2.4",
       "launch-editor@<=2.14.1": ">=2.14.2",
       "@vitest/mocker@>=2.1.0-beta.7 <4.1.12": ">=4.1.12",
-      "@vitest/mocker@>=4.1.11 <4.1.12": ">=4.1.12"
+      "@vitest/mocker@>=4.1.11 <4.1.12": ">=4.1.12",
+      "next@>=16.0.0 <=16.4.0": ">=16.4.1",
+      "ip-address@<=10.7.3": ">=10.7.4",
+      "zod@<4.6.6": ">=4.6.6",
+      "undici@>=8.0.0 <8.12.2": ">=8.12.2",
+      "fast-uri@>=4.0.0 <4.2.3": ">=4.2.3",
+      "fast-uri@>=4.0.1 <4.2.3": ">=4.2.3"
     },
     "//auditConfig": "Advisories with no patched release, ignored by GHSA so a new advisory on the same package still fails CI. GHSA-vfj7-8cjw-p6xm (braces <=3.0.3, no fix published): reached only through the dev-only @next/eslint-plugin-next > fast-glob > micromatch, which expands this repo's own lint globs, never untrusted patterns. Remove once braces ships a fix or the plugin drops fast-glob 3.",
     "auditConfig": {
