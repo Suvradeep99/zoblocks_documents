@@ -117,139 +117,82 @@ test.describe("scrolling @a11y", () => {
     }
   });
 
-  test("the section bar is tabs: one panel at a time, and the page does not move", async ({
+  test("on this page indexes one document, and an entry takes you to its section", async ({
     page,
   }) => {
     /*
-     * This used to assert scroll-spy on a row of anchors. The row is a tablist
-     * now — the anchors jumped the page under the reader — so what it owes is
-     * the opposite: choosing a tab swaps the panel in place and scrolls
-     * nothing. Every panel is still in the document, hidden, which is what
-     * keeps the page indexable and the audit complete.
+     * This asserted a tablist: one panel at a time, swapped in place. The page
+     * is one document again — every section in it, scrollable end to end,
+     * searchable with the browser — and "On this page" is the index into it.
+     * So what it owes now is the converse: every section is present and
+     * visible, and following an entry lands on that section and marks it.
      */
     await page.goto(TABS);
     await settle(page);
 
-    const bar = page.locator("nav[aria-label='On this page']");
-    await expect(bar).toBeVisible();
-    /*
-     * Hydrated before clicking. The click below is a raw mouse event at a
-     * point, and one that lands on server-rendered markup is simply lost.
-     */
-    await page
-      .locator("nav[aria-label='On this page'][data-hydrated]")
-      .waitFor({ state: "attached" });
-    const tabs = bar.getByRole("tab");
-    await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
-    await expect(tabs.first()).toHaveText("Preview");
+    const nav = page.locator("nav[aria-label='On this page']");
+    await expect(nav).toBeVisible();
+    const links = nav.getByRole("link");
+    expect(await links.count()).toBeGreaterThan(3);
 
-    /*
-     * Scroll into the page first, so a jump would be measurable — but not so
-     * far that a shorter panel could not hold the position. Preview on this
-     * page is taller than several viewports; switching to a short panel
-     * shrinks the document and the browser clamps scrollY to the new maximum,
-     * which is not a scroll and must not read as one.
-     */
-    await page.evaluate(() => window.scrollTo(0, 300));
-
-    /*
-     * Let the header finish shrinking, with scroll anchoring off.
-     *
-     * Scrolling past 12px sets `data-scrolled` on the site header a frame
-     * later, and it transitions from 64px to 52px over 500ms. Waiting for that
-     * keeps the tab still under the pointer below.
-     *
-     * Anchoring is off because the engines compensate for that 12px at
-     * different times: Chromium follows the header down frame by frame, and
-     * WebKit held it back and applied it at the next large reflow — the panel
-     * swap — so the tab was charged with a 300 → 288 it did not cause. With
-     * anchoring off the browser adjusts nothing on its own, and any scroll the
-     * page itself makes (a hash jump, `scrollIntoView`, the router) still
-     * shows.
-     */
-    await page.evaluate(() => {
-      document.documentElement.style.overflowAnchor = "none";
-    });
-    const header = page.locator("[data-site-header]");
-    await expect(header).toHaveAttribute("data-scrolled");
-    await header.evaluate((element) =>
-      Promise.all(element.getAnimations().map((animation) => animation.finished)),
+    // No hidden panels: the old bar hid every section but one.
+    const hidden = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLAnchorElement>("nav[aria-label='On this page'] a")]
+        .map((link) => link.hash.slice(1))
+        .filter((id) => {
+          const el = document.getElementById(id);
+          return !el || el.hidden || el.closest("[hidden]") !== null;
+        }),
     );
+    expect(hidden).toEqual([]);
 
-    /*
-     * A mouse click at the tab's coordinates, not `locator.click()`.
-     *
-     * `click()` scrolls its target into view first, and for a sticky bar the
-     * engines disagree about where that is — Chromium to 0 (the bar's static
-     * position is on screen from the top), WebKit to 202, Gecko to 296 —
-     * while a real click on a visible tab moves nothing. That scroll happened
-     * between the baseline and the click, so the harness's own positioning
-     * was reported as the page jumping. Traced under a parallel run: `scrollY`
-     * was already 0 when the click event arrived, and nothing on the page had
-     * called a scroll API. The tab is on screen here, so the pointer can go
-     * straight to it.
-     */
-    const usage = bar.getByRole("tab", { name: "Usage & props" });
-    const box = (await usage.boundingBox())!;
-    const before = await page.evaluate(() => window.scrollY);
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(usage).toHaveAttribute("aria-selected", "true");
-
-    /*
-     * Within a few pixels, not exact. Swapping a panel several viewports tall
-     * for a short one reflows the document, and the engines settle scrollY on
-     * different sub-pixel values afterwards — measured at 0.9px, 2px, and once
-     * 5px in WebKit under a full parallel run. The defect this rules out is the
-     * old one: an anchor jump to the section, which is hundreds of pixels.
-     */
-    const after = await page.evaluate(() => window.scrollY);
-    expect(Math.abs(after - before), `scrolled from ${before} to ${after}`).toBeLessThan(8);
+    const usage = nav.getByRole("link", { name: "Usage", exact: true });
+    await usage.click();
+    await expect(usage).toHaveAttribute("aria-current", "location");
     expect(await page.evaluate(() => window.location.hash)).toBe("#usage");
-
-    /*
-     * Only the bar's own panels. The Tabs page demonstrates the Tabs
-     * component, so the document holds a dozen other tabpanels that belong to
-     * the demos; the ones this bar controls are named by its tabs.
-     */
-    const visible = await page.evaluate(() => {
-      const owned = [
-        ...document.querySelectorAll<HTMLElement>("nav[aria-label='On this page'] [role='tab']"),
-      ].map((tab) => tab.getAttribute("aria-controls"));
-      return owned.filter((id) => id && !document.getElementById(id)?.hidden);
-    });
-    expect(visible).toEqual(["usage"]);
+    // Scrolled to, under the sticky header: the section's top sits near the
+    // top of the viewport, not wherever the page happened to be.
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.getElementById("usage")!.getBoundingClientRect().top),
+      )
+      .toBeLessThan(200);
   });
 
-  test("a section link still opens its tab", async ({ page }) => {
+  test("a section link lands on its section", async ({ page }) => {
     // An old `#usage` link — from a README, a chat, a bookmark — must keep
-    // landing on Usage, not on a hidden panel.
+    // landing on Usage, and the index must say that is where the reader is.
     await page.goto(`${TABS}#usage`);
     await settle(page);
-    const bar = page.locator("nav[aria-label='On this page']");
-    await expect(bar.getByRole("tab", { name: "Usage & props" })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    const nav = page.locator("nav[aria-label='On this page']");
+    await expect(nav.getByRole("link", { name: "Usage", exact: true })).toHaveAttribute(
+      "aria-current",
+      "location",
     );
     expect(await page.evaluate(() => document.getElementById("usage")?.hidden)).toBe(false);
+    const top = await page.evaluate(
+      () => document.getElementById("usage")!.getBoundingClientRect().top,
+    );
+    expect(top).toBeLessThan(200);
   });
 
   /*
-   * A tab that controls nothing is the tabs version of a link into a 404:
-   * a section that was renamed or removed leaves a control in the bar that
-   * shows an empty page. Checked across several components rather than one,
-   * because the bar is built conditionally from what each one documents.
+   * An entry that points nowhere is the index version of a link into a 404: a
+   * section that was renamed or removed leaves a line in the list that goes
+   * nowhere. Checked across several components rather than one, because the
+   * list is built conditionally from what each one documents.
    */
-  test("every tab controls a panel that exists", async ({ page }) => {
-    for (const name of ["tabs", "switch", "accordion", "pulse-loader", "data-grid"]) {
+  test("every entry points to a section that exists", async ({ page }) => {
+    for (const name of ["tabs", "switch", "accordion", "pulse-loader", "data-grid", "signature"]) {
       await page.goto(`/components/${name}`);
 
       const missing = await page.evaluate(() =>
-        [...document.querySelectorAll<HTMLElement>("nav[aria-label='On this page'] [role='tab']")]
-          .map((tab) => tab.getAttribute("aria-controls") ?? "")
+        [...document.querySelectorAll<HTMLAnchorElement>("nav[aria-label='On this page'] a")]
+          .map((link) => link.hash.slice(1))
           .filter((id) => !id || !document.getElementById(id)),
       );
 
-      expect(missing, `${name} has tabs controlling nothing`).toEqual([]);
+      expect(missing, `${name} lists sections that are not on the page`).toEqual([]);
     }
   });
 });
@@ -467,15 +410,37 @@ test.describe("the catalog @a11y", () => {
 /* The tab gallery                                                      */
 /* ==================================================================== */
 
-test.describe("the tab gallery @a11y", () => {
-  async function openGallery(page: Page) {
+test.describe("the tab examples @a11y", () => {
+  /*
+   * These were a chaptered gallery; the page now lists every demo as a live
+   * example, so each is addressed by its example's preview panel and nothing
+   * has to be chosen first.
+   */
+  async function openExamples(page: Page) {
     await page.goto(TABS);
-    const gallery = page.locator(".zb-gallery");
-    await gallery.scrollIntoViewIfNeeded();
-    await expect(gallery).toBeVisible();
+    const examples = page.locator("#examples");
+    await examples.scrollIntoViewIfNeeded();
+    await expect(examples).toBeVisible();
     await settle(page);
-    return gallery;
+    return examples;
   }
+
+  const preview = (page: Page, example: string) => page.locator(`#ex-${example}-panel-preview`);
+
+  /** The Variants group: one example per visual variant, as the gallery chapter was. */
+  const VARIANTS = [
+    "segmented",
+    "segmented-rich",
+    "underline",
+    "pill-filters",
+    "enclosed-editable",
+    "rail",
+    "ghost",
+    "command",
+    "stepper",
+    "card",
+    "stat",
+  ];
 
   /*
    * An icon-only trigger passes its glyph as the label, which is the supported
@@ -484,9 +449,9 @@ test.describe("the tab gallery @a11y", () => {
    * roughly eighty and filled the bar.
    */
   test("icon-only triggers render their glyph at text size", async ({ page }) => {
-    await openGallery(page);
+    await openExamples(page);
 
-    const command = page.locator("#v08");
+    const command = preview(page, "command");
     await expect(command).toBeVisible();
 
     const glyphs = await command.evaluate((demo) =>
@@ -509,8 +474,8 @@ test.describe("the tab gallery @a11y", () => {
   });
 
   test("the strip stays a normal height with icon-only triggers", async ({ page }) => {
-    await openGallery(page);
-    const strip = page.locator("#v08 .zb-tabs__list").first();
+    await openExamples(page);
+    const strip = preview(page, "command").locator(".zb-tabs__list").first();
     const box = (await strip.boundingBox())!;
     // It was ~140px tall when the glyphs were unconstrained.
     expect(box.height).toBeLessThan(72);
@@ -523,19 +488,18 @@ test.describe("the tab gallery @a11y", () => {
    * variants.
    */
   test("no variant demo renders its strip already scrolled", async ({ page }) => {
-    await openGallery(page);
+    await openExamples(page);
 
-    const overflowing = await page.evaluate(() =>
-      [...document.querySelectorAll(".zb-gallery__grid .zb-demo")]
-        .map((demo) => {
-          const list = demo.querySelector(".zb-tabs__list");
-          if (!list) return null;
-          return {
-            id: demo.id,
-            over: list.scrollWidth - list.clientWidth,
-          };
-        })
-        .filter((entry): entry is { id: string; over: number } => !!entry && entry.over > 2),
+    const overflowing = await page.evaluate(
+      (ids) =>
+        ids
+          .map((id) => {
+            const list = document.querySelector(`#ex-${id}-panel-preview .zb-tabs__list`);
+            if (!list) return null;
+            return { id, over: list.scrollWidth - list.clientWidth };
+          })
+          .filter((entry): entry is { id: string; over: number } => !!entry && entry.over > 2),
+      VARIANTS,
     );
 
     expect(overflowing).toEqual([]);
@@ -546,15 +510,10 @@ test.describe("the tab gallery @a11y", () => {
    * gave the Overflow chapter so much room that nothing overflowed, so five
    * strategies were all shown doing nothing on the page that explains them.
    */
-  test("the overflow chapter still overflows", async ({ page }) => {
-    await openGallery(page);
-    await page
-      .locator(".zb-gallery__chapters")
-      .getByRole("radio", { name: "Overflow" })
-      .click({ force: true });
-    await settle(page);
+  test("the overflow examples still overflow", async ({ page }) => {
+    await openExamples(page);
 
-    const scroll = page.locator("#o1");
+    const scroll = preview(page, "overflow-scroll");
     await expect(scroll.locator(".zb-tabs__bar")).toHaveAttribute("data-zb-end", "false");
 
     const over = await scroll
@@ -567,19 +526,29 @@ test.describe("the tab gallery @a11y", () => {
     page,
   }) => {
     await page.emulateMedia({ colorScheme: "dark" });
-    await openGallery(page);
+    await openExamples(page);
 
-    // A page-wide dark theme with eleven light-mode panels inside it argues
-    // against the thing the gallery exists to demonstrate.
-    //
-    // The attribute is the product's own `data-zb-theme`, not a docs-only
-    // stand-in. The galleries used to carry `data-zb-demo-theme` with three
-    // hand-written palettes behind it, which themed the stage and nothing
-    // inside it: component tokens are substituted where they are declared, so
-    // every field and popover kept the root's light values. Setting the real
-    // attribute means the demos are themed by the shipped mechanism, and a
-    // token that stops following a theme breaks here rather than quietly.
-    await expect(page.locator(".zb-gallery__stage")).toHaveAttribute("data-zb-theme", "dark");
+    // A page-wide dark theme with light-mode demos inside it argues against
+    // the thing the examples exist to show. The demos carry no theme of their
+    // own: they read the component tokens, which follow the site's `.dark`.
+    // So the check is the result — a tab's text resolves light on the dark
+    // page — rather than an attribute that could be set and ignored.
+    await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+    const luminance = await preview(page, "segmented")
+      .locator('[role="tab"]')
+      .first()
+      .evaluate((tab) => {
+        const [r, g, b] = getComputedStyle(tab)
+          .color.match(/[\d.]+/g)!
+          .slice(0, 3)
+          .map(Number);
+        const f = (v: number) => {
+          const c = v / 255;
+          return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        };
+        return 0.2126 * f(r!) + 0.7152 * f(g!) + 0.0722 * f(b!);
+      });
+    expect(luminance).toBeGreaterThan(0.3);
   });
 });
 
@@ -765,7 +734,9 @@ test.describe("site chrome @a11y", () => {
       await page.goto("/components/accordion");
       await settle(page);
 
-      const panel = page.locator(".instrument-demo").first();
+      // The Accordion page's live preview is its playground stage now; the
+      // rule is the same one — the stage follows the page, never dark on light.
+      const panel = page.locator("#playground .zb-stage").first();
       await expect(panel).toBeVisible();
 
       const contrast = await panel.evaluate((element) => {

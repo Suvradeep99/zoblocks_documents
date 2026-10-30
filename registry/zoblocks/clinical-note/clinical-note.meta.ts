@@ -143,4 +143,8 @@ export default defineComponentMeta({
   attestations={[{ who: "R. Menon, MD", when: "16 Aug 2026, 14:41 IST (UTC+05:30)" }]}
   addenda={[{ author: "A. Iyer, MD", when: "19 Aug 2026, 09:14 IST", text: "…" }]}
 />`,
+
+  controls: [
+    { prop: "canSign", control: "switch", label: "Policy permits signing", defaultValue: true },
+  ],
 });

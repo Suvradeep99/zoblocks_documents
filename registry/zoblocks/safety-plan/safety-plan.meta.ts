@@ -95,4 +95,15 @@ export default defineComponentMeta({
     environment: { entries: ["Priya is holding the spare keys to the garage"] },
   }}
 />`,
+
+  controls: [
+    { prop: "pinCrisisStep", control: "switch", label: "Pin crisis step", defaultValue: true },
+    {
+      prop: "density",
+      control: "segmented",
+      label: "Density",
+      options: ["patient", "standard", "clinical"],
+      defaultValue: "patient",
+    },
+  ],
 });

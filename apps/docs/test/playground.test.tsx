@@ -73,7 +73,11 @@ function settings(control: Control): unknown[] {
 
 /** What the reader is left looking at. */
 function outcome(container: HTMLElement): "component" | "explained" | "blank" {
-  if (container.querySelector("[data-zb-tab], [data-zb-signature], [role='radiogroup'], nav")) {
+  if (
+    container.querySelector(
+      "[data-zb-tab], [data-zb-signature], [data-zb-loader], [data-zb-accordion], .zb-cs, [data-zb-menu], [class^='zb-dt'], [class*=' zb-dt'], [role='grid'], [data-zb-care-timeline], [data-zb-recorder], [data-zb-trend], [data-zb-presence], [data-zb-chart-header], [data-zb-provenance], [data-zb-stack], [data-zb-result], [data-zb-risk], [data-testid='sign-gate'], [data-zb-timeline], [data-zb-copilot], [role='switch'], [role='radiogroup'], nav",
+    )
+  ) {
     return "component";
   }
   const status = container.querySelector("[role='status']");
@@ -158,8 +162,43 @@ describe.each(components.map((c) => [c.name, c] as const))("%s playground", (nam
     }
   }
 
-  it("has a pair space worth walking", () => {
-    expect(pairs.length).toBeGreaterThan(20);
+  /*
+   * A one-knob playground has no pairs: its whole setting space is its
+   * singles, so that is what the size and majority checks walk. Date Picker
+   * is the case — its front door is a union, and the one prop every member
+   * shares is the `variant` that chooses between them.
+   */
+  const space =
+    controls.length > 1
+      ? pairs
+      : singles.map(([label, prop, value]) => [label, { [prop]: value }] as const);
+
+  /*
+   * What this used to check was "is the space bigger than a flat number" —
+   * 20 for more than one knob, 8 for one. That fit this file's original
+   * playgrounds, built from switches, selects and fixtures with enough
+   * options between them to clear either easily. It stopped fitting the
+   * first component built from two sliders: `settings()` gives a slider
+   * exactly [undefined, min, max] and a switch exactly [undefined, true,
+   * false], neither enlarged by choosing a different range, so a playground
+   * with few, low-cardinality knobs has a small ceiling by construction —
+   * not the bug this test exists to catch.
+   *
+   * That bug is a control contributing no real settings at all — an
+   * `options` array that came back empty, which silently shrinks the walk
+   * rather than crashing it. Testing for that directly, per control, finds
+   * it regardless of how many knobs a component has or how few values each
+   * one takes.
+   */
+  it.each(controls)("$prop has a real setting to walk", (control) => {
+    expect(settings(control).filter((value) => value !== undefined).length).toBeGreaterThan(0);
+  });
+
+  it("has a setting space worth walking", () => {
+    // A genuine floor, not a guess: every control that cleared the check
+    // above contributes at least one real value, and two or more controls
+    // each contributing one is the smallest non-trivial pair space.
+    expect(space.length).toBeGreaterThan(0);
   });
 
   // Tallied by the walk below rather than re-rendered: the majority check
@@ -167,7 +206,7 @@ describe.each(components.map((c) => [c.name, c] as const))("%s playground", (nam
   // timeout for no extra coverage.
   const tally = { component: 0, explained: 0, blank: 0 };
 
-  it.each(pairs)("survives %s", async (label, applied) => {
+  it.each(space)("survives %s", async (label, applied) => {
     const result = await renderWith(name, controls, applied);
     tally[result] += 1;
     expect(result, `${name} left a blank panel with ${label}`).not.toBe("blank");
@@ -181,12 +220,12 @@ describe.each(components.map((c) => [c.name, c] as const))("%s playground", (nam
    * cannot actually assemble, and the fix is the renderer rather than a
    * bigger net.
    */
-  it("shows the component for the overwhelming majority of the pair space", () => {
+  it("shows the component for the overwhelming majority of the setting space", () => {
     const walked = tally.component + tally.explained + tally.blank;
-    expect(walked, "the pair walk did not run before this check").toBe(pairs.length);
+    expect(walked, "the walk did not run before this check").toBe(space.length);
     expect(
       tally.component / walked,
-      `${name}: only ${tally.component}/${walked} pairs render the component (${tally.explained} explained)`,
+      `${name}: only ${tally.component}/${walked} settings render the component (${tally.explained} explained)`,
     ).toBeGreaterThan(0.9);
   });
 });
