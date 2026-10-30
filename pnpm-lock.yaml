@@ -28,6 +28,8 @@ overrides:
   vite@>=8.2.0 <8.2.4: '>=8.2.4 <8.3'
   launch-editor@<=2.14.1: '>=2.14.2'
   follow-redirects@>=1.16.0 <1.16.1: '>=1.16.1 <2'
+  '@vitest/mocker@>=2.1.0-beta.7 <4.1.12': '>=4.1.12'
+  '@vitest/mocker@>=4.1.11 <4.1.12': '>=4.1.12'
 
 importers:
 

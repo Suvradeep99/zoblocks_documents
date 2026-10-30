@@ -557,6 +557,173 @@ export const CATALOG: ComponentDoc[] = [
       "tailwind-merge"
     ],
     "install": "npx @zoblocks/cli add accordion",
+    "controls": [
+      {
+        "prop": "variant",
+        "control": "segmented",
+        "label": "variant",
+        "options": [
+          "bordered",
+          "separate",
+          "ghost"
+        ],
+        "defaultValue": "bordered"
+      },
+      {
+        "prop": "density",
+        "control": "segmented",
+        "label": "density",
+        "options": [
+          "patient",
+          "standard",
+          "clinical"
+        ],
+        "defaultValue": "standard"
+      },
+      {
+        "prop": "size",
+        "control": "segmented",
+        "label": "size",
+        "options": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "defaultValue": "medium"
+      },
+      {
+        "prop": "expandIconPlacement",
+        "control": "segmented",
+        "label": "expandIconPlacement",
+        "options": [
+          "start",
+          "end"
+        ],
+        "defaultValue": "start"
+      },
+      {
+        "prop": "collapsible",
+        "control": "segmented",
+        "label": "collapsible",
+        "options": [
+          "header",
+          "icon",
+          "disabled"
+        ],
+        "defaultValue": "header"
+      },
+      {
+        "prop": "headingLevel",
+        "control": "slider",
+        "label": "headingLevel",
+        "min": 2,
+        "max": 6,
+        "step": 1,
+        "defaultValue": 3
+      },
+      {
+        "prop": "accordion",
+        "control": "switch",
+        "label": "accordion",
+        "defaultValue": false
+      },
+      {
+        "prop": "findable",
+        "control": "switch",
+        "label": "findable",
+        "defaultValue": true
+      },
+      {
+        "prop": "onChange",
+        "control": "event"
+      }
+    ],
+    "examples": [
+      {
+        "id": "record-while-closed",
+        "title": "A record that reads while closed",
+        "description": "Collapsed is not absent. Each header carries the fact that would change what the reader does next, and severity sits on the leading edge paired with a summary in words, never colour alone.",
+        "group": "The record",
+        "code": "import { Accordion } from \"@/components/zoblocks/accordion\";\n\nexport default function Example() {\n  return (\n    <Accordion\n      headingLevel={3}\n      items={[\n        {\n          key: \"risk\",\n          label: \"Risk & suicidality\",\n          severity: \"critical\",\n          summary: \"C-SSRS positive · 13 Aug\",\n          children: <RiskPanel />,\n        },\n        {\n          key: \"meds\",\n          label: \"Medications\",\n          severity: \"high\",\n          summary: \"Clozapine ANC due 18 Aug\",\n          children: <Medications />,\n        },\n        { key: \"plan\", label: \"Safety plan\", severity: \"normal\", summary: \"Current · revised 11 Aug\", children: <SafetyPlan /> },\n        { key: \"audit\", label: \"AUDIT\", severity: \"unknown\", summary: \"Not asked this visit\", children: <Audit /> },\n      ]}\n    />\n  );\n}"
+      },
+      {
+        "id": "pinned",
+        "title": "A section that cannot be closed",
+        "description": "The crisis step of a safety plan. Someone opening it at 2am should reach a phone number without making a single correct decision about a chevron. Pinned stays focusable, so nobody tabs past it.",
+        "group": "The record",
+        "code": "<Accordion\n  headingLevel={3}\n  items={[\n    { key: \"signs\", label: \"1 · Signs that things are getting harder\", children: <Signs /> },\n    { key: \"coping\", label: \"2 · Things I can do on my own\", children: <Coping /> },\n    {\n      key: \"crisis\",\n      label: \"3 · If none of that is working\",\n      pinned: true,\n      severity: \"critical\",\n      summary: \"Always open\",\n      children: <CrisisContacts />,\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "single-open",
+        "title": "One section at a time",
+        "description": "accordion changes the state policy and nothing else. The roles are identical to the multi-open case — there is no tablist in any configuration, which is the defect Ant Design's accordion mode has.",
+        "group": "The record",
+        "code": "<Accordion accordion headingLevel={3} defaultActiveKey={[\"risk\"]} items={chartSections} />"
+      },
+      {
+        "id": "advisory",
+        "title": "The reader chooses when to see it",
+        "description": "An advisory gate costs nothing but a choice and records nothing. Progressive disclosure at the reader's own pace is the core trauma-informed move: the point is that they decide, not that the content is concealed.",
+        "group": "Governed sections",
+        "code": "<Accordion\n  headingLevel={3}\n  onDisclose={() => true}\n  items={[\n    {\n      key: \"note\",\n      label: \"Your session summary — 13 August\",\n      access: { kind: \"advisory\", notice: \"This summary talks about self-harm\" },\n      children: <SessionSummary />,\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "reason",
+        "title": "Break the glass, with a reason",
+        "description": "Permitted, but recorded. The reason is collected before the access, not after it, and onDisclose receives the code so the application can write the audit event.",
+        "group": "Governed sections",
+        "code": "<Accordion\n  headingLevel={3}\n  onDisclose={async (event) => {\n    await audit.record({ section: event.key, reason: event.reasonCode, at: event.at });\n    return true;\n  }}\n  items={[\n    {\n      key: \"external\",\n      label: \"Records from another organisation\",\n      severity: \"high\",\n      summary: \"Access is recorded\",\n      access: {\n        kind: \"reason\",\n        reasons: [\n          { code: \"emergency\", label: \"Emergency treatment\" },\n          { code: \"covering\", label: \"Covering clinician\" },\n          { code: \"coordination\", label: \"Care coordination\" },\n        ],\n      },\n      children: <ExternalRecords />,\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "consent",
+        "title": "A consent gate",
+        "description": "Expanding a section and disclosing its content are separate events. The governing policy is named in the header, so a closed section says it too, and an expiry is stated before it lapses.",
+        "group": "Governed sections",
+        "code": "<Accordion\n  headingLevel={3}\n  onDisclose={() => true}\n  items={[\n    {\n      key: \"sud\",\n      label: \"Substance use treatment\",\n      summary: \"42 CFR Part 2\",\n      access: { kind: \"consent\", policy: \"42 CFR Part 2\", state: \"granted\", expiresAt: \"2027-02-02\" },\n      children: <SudTreatment />,\n    },\n    { key: \"notes\", label: \"Progress notes\", summary: \"142 encounters\", children: <ProgressNotes /> },\n  ]}\n/>"
+      },
+      {
+        "id": "consent-refused",
+        "title": "When the application refuses",
+        "description": "onDisclose returns false. The component says what did not happen and keeps the content where it was — the gate is an affordance for a policy the application owns, not the policy itself.",
+        "group": "Governed sections",
+        "code": "<Accordion\n  headingLevel={3}\n  onDisclose={() => false}\n  items={[\n    {\n      key: \"sud\",\n      label: \"Substance use treatment\",\n      access: { kind: \"consent\", policy: \"42 CFR Part 2\", state: \"missing\" },\n      children: <SudTreatment />,\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "withheld",
+        "title": "Withheld, and saying so",
+        "description": "Content this reader cannot obtain still gets a row. Deleting it would claim the record is complete. A withheld item cannot take children at all, so the content never reaches the bundle.",
+        "group": "Governed sections",
+        "code": "<Accordion\n  headingLevel={3}\n  items={[\n    { key: \"notes\", label: \"Progress notes\", summary: \"142 encounters\", children: <ProgressNotes /> },\n    {\n      key: \"psychotherapy\",\n      label: \"Psychotherapy notes\",\n      access: { kind: \"withheld\", reason: \"Kept separately by the author\" },\n    },\n    {\n      key: \"sealed\",\n      label: \"Adolescent visit, 2019\",\n      access: {\n        kind: \"withheld\",\n        reason: \"Sealed under state minor-consent law. Not releasable to this account.\",\n      },\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "nested",
+        "title": "Nested, with heading levels",
+        "description": "The outline is the navigation model. Every trigger sits inside a real heading, so the nested accordion steps down a level and a screen reader's heading list shows the plan's shape.",
+        "group": "Structure",
+        "code": "<Accordion\n  headingLevel={2}\n  items={[\n    {\n      key: \"plan\",\n      label: \"Treatment plan\",\n      summary: \"2 problems · 5 goals\",\n      children: (\n        <Accordion\n          headingLevel={3}\n          variant=\"ghost\"\n          items={[\n            { key: \"mdd\", label: \"Major depressive disorder, recurrent, severe\", summary: \"3 goals\", children: <Goals problem=\"mdd\" /> },\n            { key: \"aud\", label: \"Alcohol use disorder, moderate\", summary: \"2 goals\", children: <Goals problem=\"aud\" /> },\n          ]}\n        />\n      ),\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "variants",
+        "title": "Three variants",
+        "description": "Bordered for a panel of its own, separate for sections that are cards, ghost for an accordion inside something that already has a border. The keyboard model and the markup are the same in all three.",
+        "group": "Structure",
+        "code": "<Accordion variant=\"bordered\" headingLevel={3} items={items} />\n<Accordion variant=\"separate\" headingLevel={3} items={items} />\n<Accordion variant=\"ghost\" headingLevel={3} items={items} />"
+      },
+      {
+        "id": "density",
+        "title": "Density is spacing, never content",
+        "description": "Patient, standard and clinical change padding and type size. No density ever drops the summary or the severity, because which clinical facts appear is not a layout decision.",
+        "group": "Structure",
+        "code": "<Accordion density=\"patient\" headingLevel={3} items={items} />\n<Accordion density=\"standard\" headingLevel={3} items={items} />\n<Accordion density=\"clinical\" headingLevel={3} items={items} />"
+      },
+      {
+        "id": "disclosure",
+        "title": "A single disclosure",
+        "description": "One section on its own is a Disclosure: the same trigger, heading and findable panel, without the list around it.",
+        "group": "Structure",
+        "code": "import { Disclosure } from \"@/components/zoblocks/accordion\";\n\n<Disclosure\n  headingLevel={3}\n  item={{\n    key: \"why\",\n    label: \"Why are we asking this?\",\n    children: <p>Your answers help your care team spot changes early.</p>,\n  }}\n/>"
+      }
+    ],
     "relationships": {
       "builtWith": [],
       "usedIn": [
@@ -1289,7 +1456,73 @@ export const CATALOG: ComponentDoc[] = [
       "clsx",
       "tailwind-merge"
     ],
-    "install": "npx @zoblocks/cli add breath-loader"
+    "install": "npx @zoblocks/cli add breath-loader",
+    "controls": [
+      {
+        "prop": "size",
+        "control": "segmented",
+        "label": "size",
+        "options": [
+          "sm",
+          "md",
+          "lg",
+          "xl"
+        ],
+        "defaultValue": "xl"
+      },
+      {
+        "prop": "speed",
+        "control": "slider",
+        "label": "speed",
+        "min": 0.5,
+        "max": 2,
+        "step": 0.25,
+        "defaultValue": 1
+      },
+      {
+        "prop": "motion",
+        "control": "segmented",
+        "label": "motion",
+        "options": [
+          "auto",
+          "reduced",
+          "full"
+        ],
+        "defaultValue": "auto"
+      },
+      {
+        "prop": "showLabel",
+        "control": "switch",
+        "label": "showLabel",
+        "defaultValue": true
+      },
+      {
+        "prop": "label",
+        "control": "text",
+        "label": "label",
+        "defaultValue": "Loading your information"
+      }
+    ],
+    "examples": [
+      {
+        "id": "patient-facing",
+        "title": "A calm wait for patient-facing screens",
+        "description": "Fifteen breaths a minute, with no heart in it. The right default where a beating heart would read as glib: intake, behavioural health, bereavement.",
+        "code": "import { BreathLoader } from \"@/components/zoblocks/breath-loader\";\n\nexport default function Example() {\n  return (\n    <BreathLoader\n      showLabel\n      label=\"Loading your information\"\n      hint=\"This usually takes a few seconds.\"\n    />\n  );\n}"
+      },
+      {
+        "id": "brand-mark",
+        "title": "Your mark in the core",
+        "description": "children replaces the core with a mark of your own. It sits inside the hidden art, so a logo never becomes a second announcement.",
+        "code": "import { BreathLoader } from \"@/components/zoblocks/breath-loader\";\n\nexport default function Example() {\n  return (\n    <BreathLoader size=\"xl\" showLabel label=\"Signing you in\">\n      <ClinicLogo width={28} height={28} />\n    </BreathLoader>\n  );\n}"
+      },
+      {
+        "id": "over-a-form",
+        "title": "Over a form while it submits",
+        "description": "Overlay with a scrim keeps the form visible but out of reach while it saves. The label is shown by default in overlay mode.",
+        "code": "import { BreathLoader } from \"@/components/zoblocks/breath-loader\";\n\nexport default function Example() {\n  return (\n    <form style={{ position: \"relative\" }} aria-busy=\"true\">\n      <IntakeFields />\n      <BreathLoader mode=\"overlay\" label=\"Saving your answers\" />\n    </form>\n  );\n}"
+      }
+    ]
   },
   {
     "name": "care-team-presence",
@@ -1400,7 +1633,7 @@ export const CATALOG: ComponentDoc[] = [
           {
             "name": "now",
             "type": "string",
-            "description": "",
+            "description": "ISO 8601, supplied by the host. The gap this component exists to find is a window in time.",
             "required": true
           },
           {
@@ -1436,7 +1669,7 @@ export const CATALOG: ComponentDoc[] = [
           {
             "name": "now",
             "type": "string",
-            "description": "",
+            "description": "ISO 8601, supplied by the host. Adds \"started … ago\" to the conflict notice; omitted, the notice drops that clause.",
             "required": false
           },
           {
@@ -2176,6 +2409,205 @@ export const CATALOG: ComponentDoc[] = [
       "tailwind-merge"
     ],
     "install": "npx @zoblocks/cli add care-timeline",
+    "controls": [
+      {
+        "prop": "layout",
+        "control": "select",
+        "label": "Layout",
+        "options": [
+          "default",
+          "card",
+          "compact",
+          "register"
+        ],
+        "defaultValue": "default"
+      },
+      {
+        "prop": "group",
+        "control": "select",
+        "label": "Group by",
+        "options": [
+          "auto",
+          "month",
+          "quarter",
+          "year",
+          "none"
+        ],
+        "defaultValue": "auto"
+      },
+      {
+        "prop": "audience",
+        "control": "segmented",
+        "label": "Audience",
+        "options": [
+          "clinician",
+          "patient"
+        ],
+        "defaultValue": "clinician"
+      },
+      {
+        "prop": "filters",
+        "control": "switch",
+        "label": "Register filter",
+        "defaultValue": false
+      },
+      {
+        "prop": "jump",
+        "control": "switch",
+        "label": "Jump control",
+        "defaultValue": false
+      },
+      {
+        "prop": "onSelect",
+        "control": "event",
+        "label": "onSelect"
+      },
+      {
+        "prop": "onLoadOlder",
+        "control": "event",
+        "label": "onLoadOlder"
+      },
+      {
+        "prop": "onRegistersChange",
+        "control": "event",
+        "label": "onRegistersChange"
+      }
+    ],
+    "examples": [
+      {
+        "id": "chart",
+        "title": "Newest first, and the footer says of what",
+        "description": "Fourteen months, two source systems, one of them down, grouped by month. Read the footer first: the window, the order, the counts and which sources answered. It is a required prop, and it prints.",
+        "group": "What it is a view of",
+        "code": "<CareTimeline\n  aria-label=\"Care timeline for Ada Lovelace\"\n  events={events}\n  now={serverTime}\n  coverage={{\n    window: { from: \"2025-07-01\" },\n    order: \"newest-first\",\n    total: 43,\n    hidden: [{ reason: \"access\", count: 2 }],\n    sources: [\n      { id: \"ehr\", label: \"Northside EHR\", status: \"ok\" },\n      { id: \"hie\", label: \"Northside Regional Exchange\", status: \"unavailable\" },\n    ],\n  }}\n  onLoadOlder={() => fetchOlder()}\n/>"
+      },
+      {
+        "id": "source-down",
+        "title": "A source that could not be reached",
+        "description": "The repeat-CT case, caught. An unavailable source is a role=\"alert\" banner above the list, not a grey footnote under it, because the reader is about to turn an absence into a clinical fact.",
+        "group": "What it is a view of",
+        "code": "<CareTimeline\n  {...props}\n  coverage={{\n    ...coverage,\n    sources: [\n      { id: \"ehr\", label: \"Northside EHR\", status: \"ok\" },\n      {\n        id: \"hie\",\n        label: \"Northside Regional Exchange\",\n        status: \"unavailable\",\n        detail: \"Timed out after 8s.\",\n      },\n    ],\n  }}\n/>"
+      },
+      {
+        "id": "gap",
+        "title": "A stated gap in coverage",
+        "description": "Every source answered and the caller still knows of a hole, so it says so: the rail goes dashed across the missing weeks and a sentence names why. Gaps are declared, never inferred — eleven quiet weeks are not evidence of anything.",
+        "group": "What it is a view of",
+        "code": "<CareTimeline\n  {...props}\n  coverage={{\n    ...coverage,\n    gaps: [\n      { from: \"2026-04-03\", to: \"2026-06-21\", reason: \"the clinic changed record systems\" },\n    ],\n  }}\n/>"
+      },
+      {
+        "id": "filtered",
+        "title": "Filtered, with the hidden count stated",
+        "description": "One register on, and the count it hides is said beside the list rather than inside a popover that is usually off screen. Toggle a register and the line below shows what the host was told.",
+        "group": "What it is a view of",
+        "code": "<CareTimeline\n  {...props}\n  filters\n  defaultRegisters={[\"clinical\"]}\n  onRegistersChange={(registers) => save(registers)}\n/>"
+      },
+      {
+        "id": "empty",
+        "title": "No record · none in this window · none you may see",
+        "description": "Three different facts with three different next actions. Rendering them as one empty card is the ambiguity that produces a repeat scan.",
+        "group": "What it is a view of",
+        "code": "// Nothing anywhere\n<CareTimeline {...props} events={[]} coverage={{ order: \"newest-first\", sources }} />\n\n// Nothing in the window that was searched\n<CareTimeline\n  {...props}\n  events={[]}\n  coverage={{ order: \"newest-first\", window: { from: \"2025-01-01\", to: \"2025-12-31\" }, sources }}\n/>\n\n// Records exist, and none are yours to read\n<CareTimeline\n  {...props}\n  events={[]}\n  coverage={{ order: \"newest-first\", hidden: [{ reason: \"access\", count: 3 }], sources }}\n/>"
+      },
+      {
+        "id": "card",
+        "title": "The dashboard card",
+        "description": "Five entries beside other cards — the shape most patient timelines ship as. The difference is one line: five of 43, newest first, one of two sources reached. Without it, five of forty-three reads as a complete account.",
+        "group": "What it is a view of",
+        "code": "<CareTimeline {...props} layout=\"card\" limit={5} />"
+      },
+      {
+        "id": "planned",
+        "title": "Planned, above the now marker",
+        "description": "A future event sits above a now marker, and now is the caller's server time rather than the browser clock — a clinic laptop with the wrong date should not move an appointment into the past.",
+        "group": "Planned and happened",
+        "code": "<CareTimeline\n  {...props}\n  now={serverTime}\n  events={[\n    {\n      id: \"appt-endo\",\n      kind: \"appointment\",\n      occurred: \"2026-09-02T09:30:00+05:30\",\n      status: \"planned\",\n      title: \"Endocrinology review\",\n    },\n    ...events,\n  ]}\n/>"
+      },
+      {
+        "id": "lapsed",
+        "title": "Lapsed — planned, and nothing recorded against it",
+        "description": "A planned screening whose date has passed with no encounter against it. It says exactly that — not missed, not a no-show, which are conclusions the record cannot support.",
+        "group": "Planned and happened",
+        "code": "{\n  id: \"appt-retinal\",\n  kind: \"appointment\",\n  occurred: \"2026-08-05T11:00:00+05:30\",\n  status: \"planned\", // and now is after it\n  title: \"Diabetic retinal screening\",\n}"
+      },
+      {
+        "id": "cancelled",
+        "title": "Cancelled is not did-not-connect",
+        "description": "Somebody decided, and somebody tried and failed: two different facts that must not share a chip. Actor and recipient are separate fields, so the reminder cannot end up addressed to the caller.",
+        "group": "Planned and happened",
+        "code": "[\n  {\n    id: \"call-followup\",\n    kind: \"call\",\n    status: \"not-done\",\n    title: \"Follow-up call\",\n    actor: { name: \"Priya Menon\", role: \"Front desk\" },\n    recipient: { name: \"The patient\" },\n  },\n  {\n    id: \"appt-cancelled\",\n    kind: \"appointment\",\n    status: \"cancelled\",\n    title: \"Podiatry review\",\n    detail: \"Cancelled by the clinic.\",\n  },\n]"
+      },
+      {
+        "id": "amended",
+        "title": "Amended, with what changed",
+        "description": "An amendment chip with no delta tells the reader something changed and withholds the one thing they need. The revision carries what it was, when and why.",
+        "group": "Corrections and access",
+        "code": "{\n  id: \"lab-hba1c\",\n  kind: \"laboratory\",\n  status: \"amended\",\n  title: \"HbA1c — 8.9%\",\n  revision: { at: \"2026-08-15T16:20:00+05:30\", was: \"9.4%\", reason: \"result value corrected\" },\n}"
+      },
+      {
+        "id": "in-error",
+        "title": "Entered in error, retained and struck",
+        "description": "Kept and marked rather than filtered out of the query — the one behaviour the record's own rules forbid. A strike, a chip and a sentence, so it survives a monochrome print.",
+        "group": "Corrections and access",
+        "code": "{\n  id: \"enc-ed\",\n  kind: \"encounter\",\n  status: \"in-error\",\n  title: \"Emergency department attendance\",\n  revision: {\n    at: \"2026-07-31\",\n    by: { name: \"Dr A Rahman\" },\n    reason: \"recorded against this patient in error\",\n  },\n}"
+      },
+      {
+        "id": "restricted",
+        "title": "Restricted — it exists and you may not read it",
+        "description": "It says something is here without saying what. Dropping it would misrepresent the record to a reader with no way to know.",
+        "group": "Corrections and access",
+        "code": "{\n  id: \"doc-outside\",\n  kind: \"document\",\n  occurred: \"2026-06-22\",\n  title: \"Discharge summary\", // never rendered\n  access: { kind: \"withheld\", reason: \"Kept separately by its author.\" },\n}"
+      },
+      {
+        "id": "consent",
+        "title": "Consent-gated",
+        "description": "A Part 2 note the reader may open, once they record why. The date and the fact of a record are shown; the title waits behind the reason.",
+        "group": "Corrections and access",
+        "code": "{\n  id: \"note-psych\",\n  kind: \"note\",\n  occurred: \"2026-07-14\",\n  title: \"Psychotherapy progress note\",\n  access: { kind: \"consent\", policy: \"42 CFR Part 2\", state: \"granted\" },\n}"
+      },
+      {
+        "id": "thread",
+        "title": "A thread with its own steps",
+        "description": "Sent, returned and reviewed happened on different days. Flattening them into one line loses the only question anyone asks of an intake form: has anybody read it?",
+        "group": "Reading",
+        "code": "{\n  id: \"q-history\",\n  kind: \"questionnaire\",\n  title: \"Pre-visit medical history\",\n  steps: [\n    { label: \"Sent to the patient\", at: \"2026-08-11T09:00:00+05:30\", state: \"done\" },\n    { label: \"Returned by the patient\", at: \"2026-08-11T21:34:00+05:30\", state: \"done\" },\n    { label: \"Not yet reviewed\", state: \"open\" },\n  ],\n}"
+      },
+      {
+        "id": "cluster",
+        "title": "A cluster, and a critical event kept out of one",
+        "description": "Four routine observations in three days fold into one disclosure. The critical potassium beside them stays on the rail — nothing a reader would act on is ever collapsed.",
+        "group": "Reading",
+        "code": "<CareTimeline {...props} cluster={{ kinds: [\"observation\"], within: \"P3D\", min: 3 }} />"
+      },
+      {
+        "id": "new-since",
+        "title": "New since last reviewed",
+        "description": "A divider at the reader's last review splits the group into two named lists, so a rotor lands on it. A note recorded six days after the visit is marked late rather than slipping in below the line.",
+        "group": "Reading",
+        "code": "<CareTimeline {...props} seenThrough={lastReviewedAt} lateEntryAfter=\"P2D\" />"
+      },
+      {
+        "id": "imprecise",
+        "title": "An imprecise date, kept imprecise",
+        "description": "A FHIR 2019 means 2019. Widening it to 1 January invents a precision nobody recorded. A stamp with an offset renders in the record's zone, not the reader's.",
+        "group": "Reading",
+        "code": "<CareTimeline\n  {...props}\n  group=\"none\"\n  events={[\n    { id: \"cond-gdm\", kind: \"condition\", occurred: \"2019\", title: \"Gestational diabetes\" },\n    ...events,\n  ]}\n/>"
+      },
+      {
+        "id": "register",
+        "title": "Clinical on one side, everything else on the other",
+        "description": "Sides alternate on a fact — which register an event is in — rather than to fill space. Under 768px it collapses to one column and the register survives as the kind label. Jump moves between periods and never changes what is shown.",
+        "group": "Reading",
+        "code": "<CareTimeline {...props} layout=\"register\" group=\"month\" jump />"
+      },
+      {
+        "id": "patient",
+        "title": "Patient-facing, with a result not yet reviewed",
+        "description": "A different catalogue, not a softer tone: Visit and Test result rather than Encounter and Laboratory. A result can reach the patient before anyone has looked at it, so the portal has to be able to say so.",
+        "group": "Reading",
+        "code": "<CareTimeline {...props} audience=\"patient\" aria-label=\"Your care timeline\" />"
+      }
+    ],
     "relationships": {
       "builtWith": [
         "timeline"
@@ -2550,6 +2982,25 @@ export const CATALOG: ComponentDoc[] = [
       "tailwind-merge"
     ],
     "install": "npx @zoblocks/cli add chart-accordion",
+    "controls": [
+      {
+        "prop": "toolbar",
+        "control": "switch",
+        "label": "Toolbar",
+        "defaultValue": true
+      },
+      {
+        "prop": "density",
+        "control": "segmented",
+        "label": "Density",
+        "options": [
+          "patient",
+          "standard",
+          "clinical"
+        ],
+        "defaultValue": "clinical"
+      }
+    ],
     "relationships": {
       "builtWith": [
         "accordion"
@@ -3516,37 +3967,88 @@ export const CATALOG: ComponentDoc[] = [
       {
         "id": "subject",
         "title": "The subject header is the safe landing",
-        "description": "The header names the record, so the first thing under the pointer is never a verb — the wrong-patient check and the accidental click-through, closed by one decision. No prop removes it.",
+        "description": "The header names the record, so the first thing under the pointer is never a verb — the wrong-patient check and the accidental click-through, closed by one decision. It also names the menu for a screen reader. No prop removes it.",
         "fixture": "patientRoutine",
-        "code": "describeSubject({ resource: \"MedicationRequest\", id: \"m1\",\n                  label: \"Lisinopril 10 mg\", detail: \"Oral · daily\" });\n// → { who: \"Lisinopril 10 mg\", what: \"Oral · daily\", masked: false, bulk: 1 }\n\ndescribeSubject({ ...subject, masked: true });\n// → { who: \"Restricted record\", what: \"Medication\", masked: true, bulk: 1 }"
+        "group": "What it is about",
+        "code": "import { ChartContextMenu } from \"@/components/zoblocks/chart-context-menu\";\n\nexport default function MedicationRow({ order, now }) {\n  return (\n    <ChartContextMenu\n      subject={{\n        resource: \"MedicationRequest\",\n        id: order.id,\n        label: \"Lisinopril 10 mg\",\n        detail: \"Oral · daily · started 4 Mar 2026\",\n      }}\n      actions={[\n        { id: \"open\", label: \"Open order\", tier: \"routine\", shortcut: \"↵\" },\n        { id: \"copy\", label: \"Copy as text\", tier: \"routine\", shortcut: \"⌘C\" },\n        { id: \"history\", label: \"Administration history\", tier: \"routine\" },\n        {\n          id: \"mar\",\n          label: \"Add a note to the MAR\",\n          tier: \"documented\",\n          applies: [\"MedicationRequest\"],\n          records: \"Writes a note on the medication record. Nursing sees it at the next round.\",\n        },\n      ]}\n      now={now}\n      onRun={(action) => dispatch(action.id, order)}\n    >\n      {(trigger) => <tr {...trigger}>{cells}</tr>}\n    </ChartContextMenu>\n  );\n}"
+      },
+      {
+        "id": "masked",
+        "title": "A masked row makes a masked header",
+        "description": "The row hides whose note this is, so the menu does too. It reads “Restricted record” and never resolves the name, even though the subject carries it. The menu may say less than its trigger; it may never say more.",
+        "fixture": "patientRestricted",
+        "group": "What it is about",
+        "code": "<ChartContextMenu\n  subject={{\n    resource: \"DocumentReference\",\n    id: note.id,\n    label: \"Group therapy note — Nwosu, C.\",\n    detail: \"Signed by R. Adeyemi, LPC\",\n    masked: true,\n  }}\n  actions={noteActions}\n  policy={{ role: \"a registered nurse\", breakGlass: true }}\n  now={now}\n>\n  {(trigger) => <tr {...trigger}>{maskedCells}</tr>}\n</ChartContextMenu>"
+      },
+      {
+        "id": "bulk",
+        "title": "A selection is counted, never listed",
+        "description": "Twelve orders selected reads as twelve orders, not twelve names in a floating layer. Copy is marked bulk-safe and runs for all of them; Discontinue is not, and says so in place rather than vanishing.",
+        "fixture": "patientRoutine",
+        "group": "What it is about",
+        "code": "<ChartContextMenu\n  subject={{\n    ...firstOrder,\n    plural: \"orders\",\n    bulkDetail: \"Morning round\",\n    also: otherOrders.map((order) => ({ resource: \"MedicationRequest\", id: order.id })),\n  }}\n  actions={[\n    { id: \"copy\", label: \"Copy as text\", tier: \"routine\", bulk: \"allowed\" },\n    { id: \"dc\", label: \"Discontinue\", tier: \"clinical\", applies: [\"MedicationRequest\"],\n      confirm: \"The next scheduled dose is 14:00 today. Discontinuing stops it.\" },\n  ]}\n  now={now}\n>\n  {(trigger) => <tr {...trigger}>{selectionCells}</tr>}\n</ChartContextMenu>"
       },
       {
         "id": "tiers",
         "title": "Consequence is a rank, not a boolean",
-        "description": "Routine runs on the click. Recorded runs and says what it wrote. Clinical takes a second step. A disclosure takes a reason. The resolver lays the bands out in that order, so a discontinue is never adjacent to a copy.",
+        "description": "Routine runs on the click. Recorded runs and says what it writes before you choose it. Clinical takes a second step, drawn under its row, with the verb on the button and Keep beside it. The bands sort by consequence, so a discontinue is never adjacent to a copy.",
         "fixture": "patientRoutine",
-        "code": "actionOutcome(discontinue);\n// → { kind: \"confirm\", prompt: \"The next dose is 14:00 today…\", verb: \"Discontinue\" }\n\nactionOutcome(discontinue, { confirming: \"dc\" });   // → { kind: \"run\" }\nactionOutcome(preliminary);\n// → { kind: \"blocked\", reason: \"Preliminary results are not released\" }"
-      },
-      {
-        "id": "withheld",
-        "title": "Withheld is counted, never hidden",
-        "description": "Policy removes the verb and leaves a number in its place, as a row inside the menu. The same rule the palette applies to patients it may not name.",
-        "fixture": "patientRestricted",
-        "code": "resolveMenu(subject, actions, { permitted: [\"open\", \"copy\"] }).withheld;  // → 3\n\ndescribeHiddenActions(3, { role: \"a registered nurse\", breakGlass: true });\n// → \"3 further actions on this record, hidden for a registered nurse — break-glass required\""
+        "group": "Consequence",
+        "code": "const actions = [\n  { id: \"copy\", label: \"Copy as text\", tier: \"routine\" },\n  {\n    id: \"mar\",\n    label: \"Add a note to the MAR\",\n    tier: \"documented\",\n    applies: [\"MedicationRequest\"],\n    records: \"Writes a note on the medication record. Nursing sees it at the next round.\",\n  },\n  {\n    id: \"dc\",\n    label: \"Discontinue\",\n    tier: \"clinical\",\n    applies: [\"MedicationRequest\"],\n    confirm: \"The next scheduled dose is 14:00 today. Discontinuing stops it.\",\n    confirmVerb: \"Discontinue\",\n  },\n];\n\n<ChartContextMenu subject={order} actions={actions} now={now} onRun={run}>\n  {(trigger) => <tr {...trigger}>{cells}</tr>}\n</ChartContextMenu>"
       },
       {
         "id": "disclosure",
         "title": "The record is made when the reasons are offered",
-        "description": "The record is written when the list is drawn, again when a reason is chosen, and again as \"abandoned\" if the reader closes instead. In a privacy review the abandoned ones are the interesting ones. The label never appears in it.",
+        "description": "A disclosive action takes a reason first. The record is produced when the list is drawn, again when a reason is chosen, and again as \"abandoned\" if the reader backs out — in a privacy review the abandoned ones are the interesting ones. The label never appears in it.",
         "fixture": "patientRestricted",
-        "code": "disclosureRecord(revealPart2, subject, { now, outcome: \"offered\" });\n// → { at: now, action: \"part2\", subject: { resource, id },\n//     subjectNamed: false, masked: false, reason: null,\n//     outcome: \"offered\", breakGlass: true }"
+        "group": "Consequence",
+        "code": "<ChartContextMenu\n  subject={buprenorphineOrder}\n  actions={[\n    {\n      id: \"part2\",\n      label: \"Reveal Part 2 program notes\",\n      tier: \"disclosive\",\n      applies: [\"MedicationRequest\"],\n      reasons: [\n        \"Treatment of this patient\",\n        \"Medical emergency (42 CFR §2.51)\",\n        \"Written patient consent on file\",\n      ],\n    },\n  ]}\n  policy={{ role: \"a registered nurse\", breakGlass: true }}\n  now={serverTime}\n  onDisclose={(record) => audit.write(\"disclosure\", record)}\n>\n  {(trigger) => <tr {...trigger}>{cells}</tr>}\n</ChartContextMenu>"
+      },
+      {
+        "id": "unavailable",
+        "title": "Unavailable, with the reason in place",
+        "description": "A verb this person cannot run right now stays in the menu, reachable by keyboard, with the reason as text rather than a tooltip. Choosing it tells the host through onBlocked — repeated blocks are a permissions problem worth seeing.",
+        "fixture": "patientRoutine",
+        "group": "Availability",
+        "code": "{\n  id: \"renew\",\n  label: \"Renew for 90 days\",\n  tier: \"clinical\",\n  applies: [\"MedicationRequest\"],\n  confirm: \"Issues a new order in your name.\",\n  availability: {\n    status: \"unavailable\",\n    reason: \"Prescriber role required — you are signed in as a registered nurse\",\n  },\n}"
+      },
+      {
+        "id": "withheld",
+        "title": "Withheld is counted, never hidden",
+        "description": "Policy removes the verb and leaves a number in its place, as a row inside the menu. The count teaches the reader something exists; silence would teach them it does not.",
+        "fixture": "patientRestricted",
+        "group": "Availability",
+        "code": "<ChartContextMenu\n  subject={order}\n  actions={medicationActions}\n  policy={{\n    role: \"a registered nurse\",\n    permitted: [\"open\", \"copy\", \"history\", \"mar\"],\n    breakGlass: true,\n  }}\n  now={now}\n>\n  {(trigger) => <tr {...trigger}>{cells}</tr>}\n</ChartContextMenu>"
       },
       {
         "id": "pending",
         "title": "A menu that never moves under the cursor",
-        "description": "A check still running renders at the row's final height, in its final position — never appended when the answer lands. Appending would move rows under a pointer already in flight. The arrows skip it too.",
+        "description": "A check still running renders at the row's final height, in its final position, and the arrows skip it. When the answer lands the row changes in place — never appended, because appending moves a destructive verb under a pointer already in flight.",
         "fixture": "patientRoutine",
-        "code": "nextIndex(rows, 0, 1);        // skips the row whose status is \"pending\"\nactionOutcome(stillChecking);\n// → { kind: \"blocked\", reason: \"Still checking whether this can run\" }"
+        "group": "Availability",
+        "code": "const actions = [\n  openOrder,\n  { ...copyAsText, availability: canCopy ?? { status: \"pending\" } },\n  history,\n];\n\n<ChartContextMenu subject={order} actions={actions} now={now}>\n  {(trigger) => <tr {...trigger}>{cells}</tr>}\n</ChartContextMenu>"
+      },
+      {
+        "id": "empty",
+        "title": "Two empties, two sentences",
+        "description": "A record that supports nothing and a record whose every verb is withheld from you are different facts, so they read differently: “This record supports no actions” against “No action on this record is available to you”, with the count of what is hidden.",
+        "fixture": "patientRoutine",
+        "group": "Availability",
+        "code": "<ChartContextMenu subject={order} actions={[]} now={now}>\n  {(trigger) => <tr {...trigger}>{cells}</tr>}\n</ChartContextMenu>\n\n<ChartContextMenu\n  subject={order}\n  actions={medicationActions}\n  policy={{ role: \"a scheduling clerk\", permitted: [], breakGlass: false }}\n  now={now}\n>\n  {(trigger) => <tr {...trigger}>{cells}</tr>}\n</ChartContextMenu>"
+      },
+      {
+        "id": "view-state",
+        "title": "Toggles are view state, always routine",
+        "description": "Checkbox and radio rows change what the reader sees, not the record, so they report through onToggle rather than onRun and the validator refuses them above tier=“routine”. Pinning a column and discontinuing a drug must never look like the same kind of act.",
+        "group": "Structure",
+        "code": "<ChartContextMenu\n  subject={{ resource: \"Encounter\", id: \"col-vitals\", label: \"Vitals column\" }}\n  actions={[\n    { id: \"pin\", label: \"Pin this column\", tier: \"routine\", kind: \"checkbox\", checked: pinned },\n    { id: \"abn\", label: \"Abnormal values only\", tier: \"routine\", kind: \"checkbox\", checked: abnormal },\n    { id: \"comfortable\", label: \"Comfortable\", tier: \"routine\", kind: \"radio\",\n      radioGroup: \"density\", group: \"Density\", checked: density === \"comfortable\" },\n    { id: \"compact\", label: \"Compact\", tier: \"routine\", kind: \"radio\",\n      radioGroup: \"density\", group: \"Density\", checked: density === \"compact\" },\n  ]}\n  onToggle={(action, checked) => setView(action.id, checked)}\n>\n  {(trigger) => <th {...trigger}>Vitals</th>}\n</ChartContextMenu>"
+      },
+      {
+        "id": "submenu",
+        "title": "A submenu opens beside its row",
+        "description": "Routine actions only, with a short hover intent and no preview of the record's value — a floating layer showing PHI is a disclosure surface during a screen-share. The child flips to the other side when its row is in a corner.",
+        "group": "Structure",
+        "code": "{\n  id: \"trend\",\n  label: \"Trend\",\n  tier: \"routine\",\n  submenu: [\n    { id: \"t7\", label: \"Last 7 days\", tier: \"routine\" },\n    { id: \"t30\", label: \"Last 30 days\", tier: \"routine\" },\n    { id: \"t365\", label: \"Last year\", tier: \"routine\" },\n  ],\n}"
       }
     ],
     "fixtures": [
@@ -4461,7 +4963,15 @@ export const CATALOG: ComponentDoc[] = [
       "prosemirror-history",
       "prosemirror-commands"
     ],
-    "install": "npx @zoblocks/cli add clinical-note"
+    "install": "npx @zoblocks/cli add clinical-note",
+    "controls": [
+      {
+        "prop": "canSign",
+        "control": "switch",
+        "label": "Policy permits signing",
+        "defaultValue": true
+      }
+    ]
   },
   {
     "name": "clinical-status",
@@ -4923,6 +5433,7 @@ export const CATALOG: ComponentDoc[] = [
         "title": "Criticality, mapped rather than guessed",
         "description": "The interpretation code decides the step. HH and LL are the panic values and the only ones that reach critical; H and L are simply outside the range, and conflating the two is how an alert list becomes noise nobody reads.",
         "fixture": "observationPotassiumCritical",
+        "group": "From the record",
         "code": "import { ClinicalStatus, fromInterpretation } from \"@/components/zoblocks/clinical-status\";\nimport { observationPotassiumCritical } from \"@zoblocks/fixtures\";\n\nconst code = observationPotassiumCritical.interpretation?.[0]?.coding?.[0]?.code;\nconst step = fromInterpretation(code);\n\n// null rather than a guess when the code is unrecognised: a visible gap beats\n// a plausible lie.\n{step && <ClinicalStatus scale=\"criticality\" step={step} qualifier=\"resulted 41 minutes ago\" />}"
       },
       {
@@ -4930,13 +5441,36 @@ export const CATALOG: ComponentDoc[] = [
         "title": "Restricted is a state, not a gap",
         "description": "Part 2 is its own step rather than a flavour of restricted, because 42 CFR Part 2 is a different legal regime from HIPAA minimum-necessary with a different re-disclosure rule. Rendering them the same teaches staff that they are the same.",
         "fixture": "patientRestricted",
+        "group": "From the record",
         "code": "<ClinicalStatus scale=\"access\" step=\"part-2\" />\n\n// The chip describes how protected a record is without disclosing any of it,\n// which is what lets it appear on a screen the reader is not cleared for."
+      },
+      {
+        "id": "nine-scales",
+        "title": "Nine scales, one vocabulary",
+        "description": "No free text anywhere. Amber means the same thing in the lab module and the vitals module because there is only one place it is defined. Each step pairs a tone with a drawn glyph and a word.",
+        "group": "Vocabulary",
+        "code": "import { ClinicalStatus } from \"@/components/zoblocks/clinical-status\";\nimport { SCALES, SCALE_NAMES } from \"@/lib/zoblocks-clinical-status\";\n\nexport default function Example() {\n  return SCALE_NAMES.map((scale) => (\n    <section key={scale}>\n      <h3>{SCALES[scale].label}</h3>\n      {SCALES[scale].steps.map((step) => (\n        <ClinicalStatus key={step.id} scale={scale} step={step.id} />\n      ))}\n    </section>\n  ));\n}"
+      },
+      {
+        "id": "hue-removed",
+        "title": "Hue removed",
+        "description": "The same six chips, desaturated — a monochrome display, a ward printer, or a clinician with a red-green deficiency. Shape and word both survive; nothing is lost but the pleasantness.",
+        "group": "Vocabulary",
+        "code": "<div style={{ filter: \"grayscale(1)\" }}>\n  <ClinicalStatus scale=\"criticality\" step=\"critical\" />\n  <ClinicalStatus scale=\"criticality\" step=\"high\" />\n  <ClinicalStatus scale=\"criticality\" step=\"normal\" />\n  <ClinicalStatus scale=\"criticality\" step=\"not-assessed\" />\n  <ClinicalStatus scale=\"access\" step=\"restricted\" />\n  <ClinicalStatus scale=\"result-status\" step=\"preliminary\" />\n</div>"
+      },
+      {
+        "id": "three-shapes",
+        "title": "One datum, three shapes",
+        "description": "The chip carries all three channels and is the only one safe on its own. The dot drops the visible word and needs the legend beside it. The affix is for tables past about forty rows.",
+        "group": "Presentations",
+        "code": "import { ClinicalStatus, StatusLegend } from \"@/components/zoblocks/clinical-status\";\n\n<ClinicalStatus scale=\"criticality\" step=\"critical\" />\n<ClinicalStatus scale=\"criticality\" step=\"critical\" density=\"compact\" />\n<ClinicalStatus scale=\"criticality\" step=\"critical\" shape=\"dot\" />\n<ClinicalStatus scale=\"criticality\" step=\"critical\" shape=\"affix\" />\n\n<StatusLegend scale=\"criticality\" />"
       },
       {
         "id": "grid-affix",
         "title": "Forty rows, and no field of pills",
         "description": "At forty rows, forty chips is a colour field with a table behind it. The affix keeps the tone as a 3px rule at the row's leading edge and the meaning as a short word, and the row stays readable.",
         "fixture": "observationPreliminary",
+        "group": "Presentations",
         "code": "<td>\n  <ClinicalStatus\n    scale=\"result-status\"\n    step=\"preliminary\"\n    shape=\"affix\"\n    density=\"compact\"\n  />\n</td>"
       },
       {
@@ -4944,7 +5478,15 @@ export const CATALOG: ComponentDoc[] = [
         "title": "The same step, in the other register",
         "description": "\"Entered in error\" is an internal state. A portal that ships it has not translated anything — it has published a system word to the person the record is about.",
         "fixture": "observationCorrected",
+        "group": "Registers",
         "code": "<ClinicalStatus scale=\"result-status\" step=\"entered-in-error\" audience=\"patient\" />\n// renders \"Recorded by mistake\""
+      },
+      {
+        "id": "both-registers",
+        "title": "Both registers, side by side",
+        "description": "The register is a prop, and both sides of every step are required by the type, so a scale cannot ship with a clinician word and no patient word.",
+        "group": "Registers",
+        "code": "{([\"clinician\", \"patient\"] as const).map((audience) => (\n  <div key={audience}>\n    <ClinicalStatus scale=\"result-status\" step=\"entered-in-error\" audience={audience} />\n    <ClinicalStatus scale=\"result-status\" step=\"preliminary\" audience={audience} />\n    <ClinicalStatus scale=\"data-quality\" step=\"self-reported\" audience={audience} />\n    <ClinicalStatus scale=\"access\" step=\"part-2\" audience={audience} />\n    <ClinicalStatus scale=\"criticality\" step=\"critical\" audience={audience} />\n  </div>\n))}"
       }
     ],
     "fixtures": [
@@ -5392,7 +5934,19 @@ export const CATALOG: ComponentDoc[] = [
       "@zoblocks/copilot-core",
       "@zoblocks/copilot-react"
     ],
-    "install": "npx @zoblocks/cli add copilot"
+    "install": "npx @zoblocks/cli add copilot",
+    "controls": [
+      {
+        "prop": "announcementMode",
+        "control": "segmented",
+        "label": "Streaming announced as",
+        "options": [
+          "summary",
+          "progressive"
+        ],
+        "defaultValue": "summary"
+      }
+    ]
   },
   {
     "name": "data-grid",
@@ -5985,6 +6539,18 @@ export const CATALOG: ComponentDoc[] = [
         "defaultValue": 1
       },
       {
+        "prop": "masthead",
+        "control": "switch",
+        "label": "Masthead",
+        "defaultValue": true
+      },
+      {
+        "prop": "footer",
+        "control": "switch",
+        "label": "Footer",
+        "defaultValue": true
+      },
+      {
         "prop": "onSortChange",
         "control": "event",
         "label": "onSortChange"
@@ -6072,44 +6638,107 @@ export const CATALOG: ComponentDoc[] = [
       {
         "id": "coverage",
         "title": "Coverage is arithmetic, not a footer note",
-        "description": "The claim goes above the rows it is about. Rendering the page size as the total is the one failure this type exists to prevent.",
+        "description": "The claim goes above the rows it is about: 6 of 312, and the predicate that produced them. Rendering the page size as the total is the one failure this type exists to prevent — and aria-rowcount says 313, so a screen reader hears the same number.",
         "fixture": "caseloadPhq9",
-        "code": "describeGridCoverage({ shown: 6, total: 312, noun: \"clients on this caseload\" });\n// → \"6 of 312 clients on this caseload.\"\n\ndescribeGridCoverage({ shown: 6, total: \"unknown\", noun: \"clients\" });\n// → \"6 clients shown. The source did not say how many match.\"\n\ngridUnseenCount({ shown: 6, total: 312 });     // → 306\ngridUnseenCount({ shown: 6, total: \"unknown\" }); // → null"
+        "group": "Coverage",
+        "code": "<DataGrid\n  caption=\"Clients on this team's caseload with a raised PHQ-9 or a recent risk screen\"\n  title=\"Caseload · adult outpatient\"\n  columns={columns}\n  rows={rows}\n  rowKey={(row) => row.mrn}\n  coverage={{\n    shown: rows.length,\n    total: 312,\n    noun: \"clients on this team's caseload\",\n    predicate: \"PHQ-9 of 10 or more, or a risk screen in the last 14 days.\",\n  }}\n/>"
       },
       {
-        "id": "absence",
-        "title": "An absence sorts last, in both directions",
-        "description": "A PHQ-9 the client has not completed is not a PHQ-9 of zero. Four “Awaiting” rows above a score of 7 tells a reader the caseload is doing better than it is.",
-        "fixture": "caseloadPhq9",
-        "code": "const phq9 = { key: \"phq9\", header: \"PHQ-9\", kind: \"measure\",\n               value: (r) => r.phq9 };\n\nsortGridRows(rows, phq9, \"ascending\").map((r) => r.phq9);\n// → [7, 11, 18, 22, { absent: \"awaiting\" }, { absent: \"restricted\" }]\n\nsortGridRows(rows, phq9, \"descending\").map((r) => r.phq9);\n// → [22, 18, 11, 7, { absent: \"awaiting\" }, { absent: \"restricted\" }]"
+        "id": "unknown-total",
+        "title": "A total the source will not give",
+        "description": "Bundle.total is optional in FHIR, so “the server did not say” is the common case, not an edge. The grid says so in words and sets aria-rowcount to -1 rather than inventing a denominator.",
+        "fixture": "unknownTotal",
+        "group": "Coverage",
+        "code": "<DataGrid\n  {...props}\n  coverage={{ shown: rows.length, total: \"unknown\", noun: \"clients\" }}\n/>\n// → \"6 clients shown. The source did not say how many match.\""
       },
       {
-        "id": "derived",
-        "title": "Sorting by a model is ranking a prediction",
-        "description": "The derivation travels with the column, so the footnote is generated rather than remembered. Sorting by it promotes the footnote to a statement under the table.",
-        "fixture": "caseloadPhq9",
-        "code": "describeGridDerivation({\n  model: \"disengagement\",\n  version: \"v1.8\",\n  validatedOn: \"9,140 outpatient episodes\",\n  population: \"adults, English-language intake only\",\n});\n// → \"disengagement v1.8, validated on 9,140 outpatient episodes,\n//    adults, English-language intake only.\""
+        "id": "everything",
+        "title": "Everything, with nothing hidden",
+        "description": "When every match is on screen the grid says that too — “All 6 referrals” — because silence would leave the reader to guess whether there is more.",
+        "group": "Coverage",
+        "code": "<DataGrid {...props} coverage={{ shown: 6, total: 6, noun: \"referrals\" }} />"
       },
       {
-        "id": "arrivals",
-        "title": "Results arrive; nothing moves",
-        "description": "The grid counts what has landed and holds it. Merging is the reader's decision, taken with a hand on the pointer.",
-        "fixture": "caseloadPhq9",
-        "code": "describeGridArrivals(3, \"11:47\");\n// → \"3 results arrived at 11:47 — nothing moved.\"\n\n<DataGrid arrivals={held} arrivalsAt=\"11:47\" onAdmitArrivals={admit} … />\n// The rows prop never changes until admit() is called."
-      },
-      {
-        "id": "export",
-        "title": "An export is an attack surface",
-        "description": "A patient's preferred name is free text from a registration desk. Nothing turns this off, because the person who opens the file rarely chose the column.",
-        "fixture": "caseloadPhq9",
-        "code": "neutraliseGridCell(\"=cmd|' /C calc'!A0\");   // → \"'=cmd|' /C calc'!A0\"\nneutraliseGridCell(\"＝HYPERLINK(...)\");      // → \"'＝HYPERLINK(...)\"  full-width too\nneutraliseGridCell(\"Ade-Smith\");             // → \"Ade-Smith\"        unchanged\n\ntoGridDelimited(rows, columns, { coverage });\n// Row 1 is the coverage sentence, because an export outlives its screen."
+        "id": "empty",
+        "title": "The predicate matched nobody",
+        "description": "Zero rows is an answer, stated as one — “No clients match.” — with the column headers still drawn, so the reader can see what was being looked for.",
+        "group": "Coverage",
+        "code": "<DataGrid {...props} rows={[]} coverage={{ shown: 0, total: 0, noun: \"clients\" }} />"
       },
       {
         "id": "refusal",
         "title": "A refusal, not a nine-second paint",
-        "description": "Twenty thousand is measured, not chosen. It is where a forty-column model on a shared 4 GB ward workstation stops being usable at handover.",
+        "description": "Above the ceiling the grid refuses rather than degrading, and says what to do instead. Twenty thousand is the measured default — where a forty-column model on a shared ward workstation stops being usable; the example sets 4 to show it.",
         "fixture": "unknownTotal",
-        "code": "gridCapacityRefusal(18_000);   // → null\ngridCapacityRefusal(120_000);\n// → \"120,000 rows is past what this renders on a ward workstation\n//    (the ceiling is 20,000). Narrow the query or move paging to the\n//    server — the grid will not pretend to hold them.\""
+        "group": "Coverage",
+        "code": "<DataGrid\n  {...props}\n  ceiling={4}            // default 20,000\n  coverage={{ shown: 6, total: 1438, noun: \"patients\" }}\n/>"
+      },
+      {
+        "id": "absence",
+        "title": "An absence sorts last, in both directions",
+        "description": "Awaiting, restricted, not recorded, declined, not known — five absences, each in words with its reason in the foot. A PHQ-9 the client has not completed is not a PHQ-9 of zero, so absences sort after every value whichever way the column runs.",
+        "fixture": "caseloadPhq9",
+        "group": "What a cell says",
+        "code": "const phq9 = {\n  key: \"phq9\",\n  header: \"PHQ-9\",\n  kind: \"measure\",\n  value: (row) => row.phq9,    // a number, or { absent: \"awaiting\" | \"restricted\" | … }\n};\n\n<DataGrid {...props} columns={[name, phq9, …]} defaultSort={{ key: \"phq9\", direction: \"ascending\" }} />"
+      },
+      {
+        "id": "derived",
+        "title": "Sorting by a model is ranking a prediction",
+        "description": "The derivation travels with the column, so the footnote is generated rather than remembered. Sorting by it promotes the footnote to a statement under the table: “Sorted by a prediction — see note 1.”",
+        "fixture": "caseloadPhq9",
+        "group": "What a cell says",
+        "code": "const risk = {\n  key: \"risk\",\n  header: \"Disengagement\",\n  kind: \"number\",\n  value: (row) => row.risk,\n  derived: {\n    model: \"disengagement\",\n    version: \"v1.8\",\n    validatedOn: \"9,140 outpatient episodes\",\n    population: \"adults, English-language intake only\",\n  },\n};\n\n<DataGrid {...props} defaultSort={{ key: \"risk\", direction: \"descending\" }} />"
+      },
+      {
+        "id": "arrivals",
+        "title": "Results arrive; nothing moves",
+        "description": "The grid counts what has landed and holds it: “3 results arrived at 11:47 — nothing moved.” Merging is the reader's decision, taken when they ask, because a row that jumps under a pointer is a row somebody acts on by mistake.",
+        "fixture": "caseloadPhq9",
+        "group": "What a cell says",
+        "code": "<DataGrid\n  {...props}\n  rows={rows}\n  arrivals={held}\n  arrivalsAt=\"11:47\"\n  onAdmitArrivals={(arrived) => setRows(merge(rows, arrived))}\n/>\n// rows never changes until the reader asks."
+      },
+      {
+        "id": "reading",
+        "title": "The row the reader is on",
+        "description": "A real grid with two-dimensional navigation. Click a cell and use the arrows: the foot re-states who the row is about — “Row 2 of 312 — Adeyemi, R., MRN 4471902” — at the point of action, where a wrong-patient error happens.",
+        "group": "Reading and acting",
+        "code": "<DataGrid\n  {...props}\n  identify={(row) => ({ primary: row.name, secondary: `MRN ${row.mrn}` })}\n  onRowActivate={(row) => openChart(row.mrn)}\n/>"
+      },
+      {
+        "id": "selected",
+        "title": "Selected, with the verbs that reach them",
+        "description": "Selection is controlled, and only exists when there is something to do with it: omit selectedKeys and there is no checkbox column at all. The bulk bar names how many rows it will act on.",
+        "group": "Reading and acting",
+        "code": "<DataGrid\n  {...props}\n  selectedKeys={selected}\n  onSelectionChange={setSelected}\n  bulkActions={(rows) => (\n    <>\n      <button type=\"button\">Assign clinician</button>\n      <button type=\"button\">Schedule contact · {rows.length}</button>\n    </>\n  )}\n/>"
+      },
+      {
+        "id": "pinned",
+        "title": "Pinned identity, scrolled sideways",
+        "description": "Scroll the grid to the right: the client's name stays. A measure that has scrolled away from the name it belongs to is a number about nobody.",
+        "group": "Reading and acting",
+        "code": "<DataGrid {...props} columns={wideColumns} pinnedColumns={1} maxHeight=\"18rem\" />"
+      },
+      {
+        "id": "loading",
+        "title": "Loading more, and the end of what is known",
+        "description": "Scroll to the bottom: the grid asks, the host appends, and when there is no more it says so instead of waiting forever. It follows FHIR's link.next rather than a pager, because “page 4 of 7” cannot be built against a server that will not give a total.",
+        "group": "Reading and acting",
+        "code": "<DataGrid\n  {...props}\n  rows={loaded}\n  coverage={{ shown: loaded.length, total: \"unknown\", noun: \"clients\" }}\n  maxHeight=\"16rem\"\n  onReachEnd={fetchNext}        // follow Bundle.link.next\n  loadingMore={fetching}\n  exhausted={!nextLink}\n/>"
+      },
+      {
+        "id": "host-framed",
+        "title": "Framed by the host, not by itself",
+        "description": "Inside an application screen that already names the list and its filters, the masthead and foot are the same claim twice. Turn them off; the caption still names the grid for a screen reader, and `describeGridCoverage(coverage)` is the one line the host places instead.",
+        "group": "Framing and export",
+        "code": "<DataGrid {...props} masthead={false} footer={false} />"
+      },
+      {
+        "id": "export",
+        "title": "An export is an attack surface",
+        "description": "A preferred name is free text from a registration desk. Every cell that would start a formula is neutralised — full-width lookalikes too — and row 1 of the file is the coverage sentence, because an export outlives its screen. Nothing turns this off.",
+        "fixture": "caseloadPhq9",
+        "group": "Framing and export",
+        "code": "import { toGridDelimited } from \"@/lib/zoblocks-grid\";\n\nconst csv = toGridDelimited(rows, columns, { coverage });\n// Row 1: \"6 of 312 clients on this team's caseload. PHQ-9 of 10 or more, …\"\n// '=HYPERLINK(…)  ← the leading quote keeps a spreadsheet from running it"
       }
     ],
     "fixtures": [
@@ -8218,23 +8847,209 @@ export const CATALOG: ComponentDoc[] = [
       {
         "id": "four-jobs",
         "title": "Four jobs, four variants",
-        "description": "The organising idea, in four lines. Recall is a value the user already holds; choose is one only the system knows; construct is a structure with derived members; witness is an assertion about the past. Each wants a different primary control, and picking the wrong one is how a date field becomes something staff route around.",
+        "description": "The organising idea. Recall is a value the user already holds; choose is one only the system knows; construct is a structure with derived members; witness is an assertion about the past. Each wants a different primary control, and picking the wrong one is how a date field becomes something staff route around.",
         "fixture": "patientRoutine",
-        "code": "<DatePicker variant=\"field\"      label=\"Date of service\" now={today} showRelative />\n<DatePicker variant=\"slots\"      set={availability} now={now} onSelect={hold} />\n<DatePicker variant=\"session\"    durationPresets={org.presets} />\n<DatePicker variant=\"readout\"    value={signedAt} showZone viewerZone={me.zone} />"
+        "group": "Fields",
+        "code": "<DatePicker variant=\"field\"   label=\"Date of service\" now={today} showRelative />\n<DatePicker variant=\"slots\"   label=\"Available times\" set={availability} now={now} />\n<DatePicker variant=\"session\" label=\"Individual therapy\" durationPresets={BEHAVIORAL_HEALTH_DURATIONS} />\n<DatePicker variant=\"readout\" as=\"time\" value={signedAt} now={today} showZone />"
+      },
+      {
+        "id": "picker",
+        "title": "Picker: a field with a calendar behind it",
+        "description": "Type 09022026 without opening anything; press the button and the grid opens on September, with closed days struck and the open-slot count under each numeral. Escape closes and keeps what was typed. The rail is the host's: `relativeDateOptions(now)`, passed in, because “Next Monday” is a scheduling convention, not a component default.",
+        "group": "Fields",
+        "code": "<DateField\n  label=\"Appointment date\"\n  showCalendar\n  now={today}\n  value={value}\n  onChange={setValue}\n  unavailable={clinicClosed}   // returns the reason, or null\n  load={openSlotCount}\n  calendarShortcuts={relativeDateOptions(today)}\n  calendarShowCustom\n  calendarHints\n  calendarCommit=\"explicit\"\n/>"
+      },
+      {
+        "id": "field",
+        "title": "Field: three segments, one tab stop",
+        "description": "The variant most healthcare fields actually want. A segment advances itself the moment no further digit could be valid — 9 in the month jumps on, 1 waits for a possible 12 — which is what makes eight keystrokes enough. With a `name`, it posts ISO into a plain HTML form.",
+        "group": "Fields",
+        "code": "<DateField label=\"Date of service\" now={today} showRelative />\n\n<DateField\n  label=\"Referral received\"\n  now={today}\n  name=\"referral_date\"          // posts 2026-08-21\n  defaultValue={plainDate(2026, 8, 21)}\n  showRelative\n/>"
+      },
+      {
+        "id": "tiers",
+        "title": "Three tiers, three behaviours",
+        "description": "There is no correct default for the future. A date of birth may never be in it: blocked, announced assertively, aria-invalid. A documentation date in the future is suspicious, not impossible: a polite warning, not invalid. A retrospective service date is ordinary — blocking it is what teaches staff to date notes to today.",
+        "group": "Fields",
+        "code": "<DateField label=\"Date of birth\" now={today} futurePolicy=\"block\" />\n<DateField label=\"Session documented\" now={today} futurePolicy=\"warn\" />\n<DateField label=\"Date of service\" now={today} showRelative />"
+      },
+      {
+        "id": "birth-date",
+        "title": "Birth date, read back as an age",
+        "description": "A transposed year is invisible in 07/18/1968 and screaming in “58 years old”. Under two years it reads in months and under four weeks in days, because a paediatric chart that says “0 years old” has discarded the number a weight-based dose is calculated from. The calendar, when it opens, opens on the year.",
+        "fixture": "patientRoutine",
+        "group": "Fields",
+        "code": "<BirthDateField now={today} defaultValue={plainDate(1986, 7, 18)} calendarHints />\n<BirthDateField now={today} defaultValue={plainDate(2026, 4, 20)} />  // 4 months\n<BirthDateField now={today} defaultValue={plainDate(2026, 8, 9)} />   // 17 days"
+      },
+      {
+        "id": "birth-date-partial",
+        "title": "Partial and absent birth dates",
+        "description": "FHIR permits YYYY and YYYY-MM for Patient.birthDate, because homeless services, unaccompanied minors and forensic intake produce them. Coercing “born around 1962” to 1 January invents a fact. Absence carries its reason, so “not recorded” and “nobody asked” stay different.",
+        "group": "Fields",
+        "code": "<BirthDateField\n  now={today}\n  allowEstimated\n  allowAbsent\n  precision=\"year\"\n  value={{ kind: \"partial-date\", y: 1962 }}\n/>\n\n<BirthDateField\n  now={today}\n  allowAbsent\n  absentReason=\"asked-declined\"\n  value={{ kind: \"absent\", reason: \"asked-declined\" }}\n/>"
+      },
+      {
+        "id": "time",
+        "title": "Time that refuses to guess",
+        "description": "Type a bare 9 into the first field: the meridiem stays empty, the value stays incomplete, and the field asks — rather than silently turning a 9 PM discharge into a 9 AM one. Presets are an interval, not a menu. The third is 24-hour with seconds, for an observation timestamp.",
+        "group": "Fields",
+        "code": "<TimeField label=\"Discharge time\" />\n<TimeField label=\"Time given\" presets={timeGrid(8 * 60, 10 * 60, 20)} />\n<TimeField label=\"Observation\" hour24 showSecond />"
+      },
+      {
+        "id": "readout",
+        "title": "Readout: the instant, then the reading aid",
+        "description": "“3 days after service” is a reading aid; the timestamp is the record. Anything a signature depends on prints its stored instant and IANA zone, and a second zone only when the reader's differs. Absent and restricted are explained rather than blank, because a blank cell reads as “nothing happened”.",
+        "group": "Fields",
+        "code": "<ClinicalDateTime as=\"time\" value={signedAt} now={today} showRelative showZone />\n<ClinicalDateTime as=\"time\" value={signedAt} now={today} viewerZone=\"America/Los_Angeles\" showZone />\n<ClinicalDateTime value={{ kind: \"absent\", reason: \"asked-declined\" }} />\n<ClinicalDateTime value={serviceDate} restricted />"
       },
       {
         "id": "antd-migration",
-        "title": "One changed import",
-        "description": "The props match antd's, so the migration is the import line and a conversion at the value boundary. That is ADR 0010's promise, and this is the component that tests it hardest — because antd actually has this one.",
+        "title": "Coming from antd",
+        "description": "Not yet one changed import line, and the differences are named rather than hidden: antd's disabledDate is `unavailable` and returns the reason instead of a boolean, because the reason is spoken and shown; the value is a plain `ZbDate`, not a Dayjs, so a birth date is never midnight UTC. There is no picker, showTime, allowClear or status yet.",
         "fixture": "appointmentBooked",
-        "code": "- import { DatePicker } from \"antd\";\n+ import { DatePicker } from \"@zoblocks/react\";\n\n  <DatePicker\n    disabledDate={closed}\n    allowClear\n    status={hasError ? \"error\" : undefined}\n-   value={dayjsValue}\n+   value={zbDate}          // { kind: \"date\", y, m, d }\n  />"
+        "group": "Fields",
+        "code": "- import { DatePicker } from \"antd\";\n+ import { DatePicker } from \"@zoblocks/react\";\n\n  <DatePicker\n-   disabledDate={(day) => isClosed(day)}\n+   unavailable={(date) => (isClosed(date) ? \"Clinic closed\" : null)}\n-   value={dayjsValue}\n+   value={zbDate}               // { kind: \"date\", y, m, d }\n+   now={today}\n  />"
+      },
+      {
+        "id": "anatomy",
+        "title": "Why the panel is shaped like this",
+        "description": "The panel never moves; the explanation does. Each note is measured off the real DOM — the accessible name it quotes is the one the cell carries, the target size is what it measures in your browser now. Every note is a real button, so paused or through a screen reader this reads as six labelled paragraphs. It never starts under reduced motion.",
+        "group": "Calendars",
+        "code": "<Calendar\n  mode=\"range\"\n  months={2}\n  weekStart={1}\n  commit=\"explicit\"\n  hints\n  presets={dateRangePresets(today)}\n  showCustomPreset\n  now={today}\n  defaultRange={{ start: plainDate(2026, 8, 17), end: plainDate(2026, 9, 11) }}\n/>"
+      },
+      {
+        "id": "calendar",
+        "title": "One tab stop, every cell named",
+        "description": "Tab to the grid and move with the arrows; PageUp/PageDown change month, with Shift the year — which the legend exists to tell you. Exactly one cell is reachable by Tab, and every cell is named as its whole date plus its state: “Wednesday, 26 August 2026, 8 times available”, not “26”.",
+        "group": "Calendars",
+        "code": "<Calendar\n  now={today}\n  defaultValue={today}\n  load={openSlotCount}\n  unavailable={clinicClosed}\n  shortcuts={relativeDateOptions(today)}\n  showCustomPreset\n  hints\n  commit=\"explicit\"\n/>"
+      },
+      {
+        "id": "multiple",
+        "title": "Several dates that are not a range",
+        "description": "The make-up sessions after a missed fortnight. Clicking a selected date removes it — a remove control inside a 32px cell would fall under the 24px target floor. The cap is refused silently at the boundary: a fifth click that does nothing teaches better than a dialog.",
+        "group": "Calendars",
+        "code": "<Calendar mode=\"multiple\" maxDates={4} now={today} unavailable={clinicClosed} hints />"
+      },
+      {
+        "id": "range",
+        "title": "A range in two clicks, never a drag",
+        "description": "There is no drag path anywhere (WCAG 2.2 SC 2.5.7). The second click completes the range in either direction: clicking the later date first has told you both ends, and swapping them is right.",
+        "group": "Calendars",
+        "code": "<Calendar\n  mode=\"range\"\n  months={2}\n  weekStart={1}\n  now={today}\n  unavailable={clinicClosed}\n  presets={dateRangePresets(today, { weekStart: 1 })}\n  showCustomPreset\n  hints\n  commit=\"explicit\"\n/>"
+      },
+      {
+        "id": "range-panel",
+        "title": "Two months, one set of controls",
+        "description": "Most ranges cross a month boundary, so the panel shows two contiguous months paged together — previous on the first, next on the last, so no two buttons announce the same name. The rail is data from `dateRangePresets(now)`, and nothing reaches the host until Done.",
+        "group": "Calendars",
+        "code": "<Calendar\n  mode=\"range\"\n  months={2}\n  commit=\"explicit\"\n  hints\n  weekStart={1}\n  presets={dateRangePresets(today, { weekStart: 1 })}\n  showCustomPreset\n  now={today}\n  defaultRange={{ start: plainDate(2026, 8, 17), end: plainDate(2026, 9, 17) }}\n/>"
+      },
+      {
+        "id": "date-range",
+        "title": "Range field: both ends typed",
+        "description": "One shell, two typed halves. The day count is inclusive — the 1st to the 7th is seven days of care — and it is the field's own proof-read: a transposed month is invisible in 03/07 – 07/07 and unmissable as “123 days”. An end before its start is an error, not a silent swap.",
+        "group": "Calendars",
+        "code": "<DateRangeField\n  label=\"Authorisation window\"\n  now={today}\n  weekStart={1}\n  months={2}\n  showSpan\n  hints\n  presets={dateRangePresets(today, { weekStart: 1 })}\n  showCustomPreset\n  maxSpanDays={90}\n  value={range}\n  onChange={setRange}\n/>"
+      },
+      {
+        "id": "session",
+        "title": "Three values, two degrees of freedom",
+        "description": "Press a duration chip and the end moves, marked Derived. Type an end and the duration recomputes — and the Held badge moves with it. Move the start: hold the duration and the session slides; hold the end and it stretches. Which one you got is shown, rather than discovered on a real appointment.",
+        "group": "Sessions",
+        "code": "<SessionTimeField\n  label=\"Individual therapy\"\n  defaultValue={sessionFrom(plainTime(9, 0), 53)}\n  durationPresets={BEHAVIORAL_HEALTH_DURATIONS}\n  bands={org.thresholds}\n/>"
+      },
+      {
+        "id": "overnight",
+        "title": "Overnight, and the guard",
+        "description": "11:30 PM to 7:30 AM is a crisis-line shift, not a typo, so the day boundary is stated as a labelled next-day marker rather than refused. The guard catches the absurd one — a start past a held end — and offers the likely correction: somebody typed 2:00 meaning the afternoon.",
+        "group": "Sessions",
+        "code": "<SessionTimeField\n  label=\"Crisis line shift\"\n  maxMinutes={720}\n  allowOvernight\n  nextDateLabel=\"Aug 27\"\n  defaultValue={withSessionEnd(sessionFrom(plainTime(23, 30), 0), plainTime(7, 30), {\n    allowOvernight: true,\n  })}\n/>"
+      },
+      {
+        "id": "bands",
+        "title": "Bands are the host's",
+        "description": "The band under the duration comes from the host's array; the component ships it empty. A fifty-three-minute session is a fact about a payer contract, and a library asserting a billing code from a duration would be clinical decision support, which ADR 0009 prohibits.",
+        "group": "Sessions",
+        "code": "const thresholds = [\n  { minMinutes: 0, maxMinutes: 15, code: null, label: \"Not billable\" },\n  { minMinutes: 16, maxMinutes: 52, code: \"SHORT\", label: \"Standard session\" },\n  { minMinutes: 53, maxMinutes: 999, code: \"LONG\", label: \"Extended session\" },\n];\n\n<SessionTimeField\n  label=\"Documentation time\"\n  defaultValue={sessionFrom(plainTime(15, 0), 12)}\n  durationPresets={BEHAVIORAL_HEALTH_DURATIONS}\n  bands={thresholds}\n/>"
+      },
+      {
+        "id": "time-range",
+        "title": "Time range: two columns, filtered",
+        "description": "Every time that cannot be an end — before the start, shorter than the minimum, longer than the maximum — is struck and says why. The length badge is the proof-read. A night shift is accepted, and its next-day crossing is said in words.",
+        "group": "Sessions",
+        "code": "<TimeRangeField\n  label=\"Time range\"\n  stepMinutes={60}\n  minDurationMinutes={30}\n  maxDurationMinutes={480}\n  value={range}\n  onChange={setRange}\n/>\n\n<TimeRangeField label=\"Night shift\" stepMinutes={30} allowOvernight />"
+      },
+      {
+        "id": "slots",
+        "title": "Availability with an age",
+        "description": "“As of 3 minutes ago”, with a refresh, because a grid that looks live and is four minutes stale is how two receptionists book the same 2 PM. Four unavailable states, each saying why. A hold is not a booking: it counts down and comes back. Nothing here fetches or books.",
+        "group": "Booking",
+        "code": "<TimeSlotGrid\n  label=\"Available times — Thu 27 Aug\"\n  set={availability}            // { asOf, staleAfterSeconds, slots, exhausted }\n  now={now}\n  value={slotId}\n  onSelect={(slot) => hold(slot.id)}\n  onRefresh={refetch}\n/>"
+      },
+      {
+        "id": "exhausted",
+        "title": "Exhausted, not empty",
+        "description": "“No times available” and “we have not looked yet” are different facts. `exhausted` says the search completed and found nothing, which licenses the next sentence: another day, another provider, the waitlist.",
+        "group": "Booking",
+        "code": "<TimeSlotGrid\n  label=\"Available times — Fri 28 Aug\"\n  set={{ asOf: now, slots: [], exhausted: true }}\n  now={now}\n/>"
+      },
+      {
+        "id": "scheduler",
+        "title": "Provider, day and time on one surface",
+        "description": "Change the provider and the day strip recolours by open-slot count before you pick a date. Buffers belong to the interval: a 50-minute session with a 10-minute turnaround occupies 60 minutes. The provider's zone is named only where it differs from yours, and nothing chosen is called a booking.",
+        "group": "Booking",
+        "code": "<AppointmentScheduler\n  label=\"Book an appointment\"\n  providers={providers}\n  actorId={providerId}\n  onActorChange={setProviderId}\n  date={date}\n  onDateChange={setDate}\n  dayLoads={dayLoads}\n  availability={availability}\n  now={now}\n  durationMinutes={50}\n  buffers={{ before: 0, after: 10 }}\n  value={slotId}\n  onSelect={(choice) => hold(choice.slot.id)}\n  viewerZone=\"America/New_York\"\n/>"
+      },
+      {
+        "id": "recurrence",
+        "title": "The rule in words, before anything exists",
+        "description": "“Every week on Tuesday at 2:00 PM, 16 times, ending 15 December”, with the first occurrences listed. A rule you cannot read before you commit is how a patient gets fifty-two appointments. The RRULE emitted is real RFC 5545 with its EXDATE.",
+        "group": "Series",
+        "code": "<RecurrenceField\n  label=\"Repeats\"\n  startDate={plainDate(2026, 9, 1)}\n  timeLabel=\"2:00 – 2:50 PM\"\n  defaultValue={{ freq: \"WEEKLY\", byWeekday: [2], count: 16 }}\n  countOptions={[4, 6, 8, 12, 16, 24]}\n  showRRule\n/>"
+      },
+      {
+        "id": "recurrence-refused",
+        "title": "Refusal, in full",
+        "description": "A rule outside the implemented subset is refused loudly, read-only, with the original string intact and the unsupported parts named — because a partial RRULE parser does not error, it expands to the wrong dates and gets booked.",
+        "group": "Series",
+        "code": "<RecurrenceField\n  label=\"Repeats\"\n  startDate={plainDate(2026, 9, 1)}\n  unsupported={{\n    source: \"FREQ=YEARLY;BYMONTH=3;BYDAY=2SU;BYHOUR=14\",\n    parts: [\"FREQ=YEARLY\", \"BYMONTH\", \"BYHOUR\"],\n  }}\n  showRRule\n/>"
+      },
+      {
+        "id": "series",
+        "title": "Collisions resolved before anything is written",
+        "description": "Sixteen weekly sessions, three colliding with things the host knows: leave, a closure, a room clash with no alternative. Each row offers the nearest working date, or says it has none. Nothing is written until every collision is resolved or accepted.",
+        "group": "Series",
+        "code": "<RecurringSeriesScheduler\n  label=\"Weekly therapy — 16 sessions\"\n  rule={{ freq: \"WEEKLY\", interval: 1, count: 16 }}\n  startDate={plainDate(2026, 9, 1)}\n  timeLabel=\"2:00 – 2:50 PM\"\n  verdicts={conflicts}          // { date, reason, alternative? }[]\n  resolved={resolved}\n  onResolve={resolve}\n  onUnresolve={unresolve}\n  onResolveAll={resolveAll}\n/>"
       },
       {
         "id": "series-arithmetic",
-        "title": "26 dates, 2 closures, 24 sessions",
-        "description": "The arithmetic is the feature. A group scheduler that prints the naive occurrence count has told the billing team a number that will not match reality, and told nine enrolled patients they are attending two sessions that will not happen. The closures are written into the rule as EXDATE, so the count survives export.",
+        "title": "26 weeks, 3 closures, 23 sessions",
+        "description": "The arithmetic is the feature. A group scheduler that prints the naive count has told billing a number that will not match, and told nine patients about sessions that will not happen. Room, facilitators and enrolment are checked together, and the closures are listed with their reasons and written into the rule as EXDATE.",
         "fixture": "encounterRoutine",
-        "code": "<DatePicker\n  variant=\"group\"\n  name=\"DBT Skills Group\"\n  rule={{ freq: \"WEEKLY\", byWeekday: [2, 4], until: plainDate(2026, 11, 30) }}\n  startDate={plainDate(2026, 9, 1)}\n  exclusions={[\n    { date: plainDate(2026, 11, 24), reason: \"Facility closure — annual training\" },\n    { date: plainDate(2026, 11, 26), reason: \"Thanksgiving\" },\n  ]}\n  room={{ name: \"Group Room B\", capacity: 14 }}\n  capacity={12}\n  enrolled={9}\n/>"
+        "group": "Series",
+        "code": "<GroupSeriesScheduler\n  name=\"DBT Skills — Emotion Regulation\"\n  rule={{ freq: \"WEEKLY\", interval: 1, byWeekday: [2], count: 26 }}\n  startDate={plainDate(2026, 9, 1)}\n  timeLabel=\"5:30 – 7:00 PM\"\n  sessionMinutes={90}\n  facilitators={[\"M. Reyes, LCSW\", \"J. Bhatt, LPC\"]}\n  room={{ name: \"Group Room 2\", capacity: 12 }}\n  capacity={12}\n  enrolled={9}\n  exclusions={[\n    { date: plainDate(2026, 11, 24), reason: \"Thanksgiving week — programme closed\" },\n    { date: plainDate(2026, 12, 22), reason: \"Winter break\" },\n    { date: plainDate(2026, 12, 29), reason: \"Winter break\" },\n  ]}\n  showRRule\n/>"
+      },
+      {
+        "id": "dst",
+        "title": "Daylight saving, classified",
+        "description": "2:30 AM on 8 March in New York does not exist; 1:30 AM on 1 November happens twice; Lord Howe shifts by thirty minutes; Kathmandu is +5:45 — why every offset here is minutes. The component does not decide what to do about any of it; this is what a host decides with.",
+        "group": "Rules it keeps",
+        "code": "import { classifyLocalTime, plainDate, plainTime } from \"@/lib/zoblocks-datetime\";\n\nclassifyLocalTime(\"America/New_York\", plainDate(2026, 3, 8), plainTime(2, 30));\n// → { kind: \"nonexistent\", skippedMinutes: 60 }\nclassifyLocalTime(\"America/New_York\", plainDate(2026, 11, 1), plainTime(1, 30));\n// → { kind: \"ambiguous\", earlierOffset: -240, laterOffset: -300 }"
+      },
+      {
+        "id": "family",
+        "title": "Density and direction, across the family",
+        "description": "The compact variants side by side. Clinical density tightens the ink and never the target: nothing interactive goes under 24px (WCAG 2.2 SC 2.5.8), segments included. `dir=“ltr”` stays pinned on the field, because inheriting RTL renders 26/08/2026 as 2026/08/26 — plausible, and wrong.",
+        "group": "Rules it keeps",
+        "code": "<div data-zb-density=\"clinical\" dir=\"rtl\">\n  <DatePicker variant=\"picker\" label=\"Picker\" now={today} />\n  <DatePicker variant=\"field\" label=\"Field\" now={today} />\n  <DatePicker variant=\"birth-date\" now={today} />\n  <DatePicker variant=\"time\" label=\"Time\" />\n  <DatePicker variant=\"session\" label=\"Session\" />\n  <DatePicker variant=\"readout\" as=\"time\" value={signedAt} now={today} showZone />\n</div>"
+      },
+      {
+        "id": "theme-density",
+        "title": "Every theme against every density",
+        "description": "Light, dark and high contrast against patient, standard and clinical density — nine combinations at once, which is how a token bug is caught, and where the 24px floor at clinical density can be measured.",
+        "group": "Rules it keeps",
+        "code": "{[\"light\", \"dark\", \"high-contrast\"].map((theme) =>\n  [\"patient\", \"standard\", \"clinical\"].map((density) => (\n    <div key={theme + density} data-zb-theme={theme} data-zb-density={density}>\n      <Calendar now={today} defaultValue={today} unavailable={clinicClosed} />\n    </div>\n  )),\n)}"
       }
     ],
     "fixtures": [
@@ -8548,7 +9363,73 @@ export const CATALOG: ComponentDoc[] = [
       "clsx",
       "tailwind-merge"
     ],
-    "install": "npx @zoblocks/cli add helix-loader"
+    "install": "npx @zoblocks/cli add helix-loader",
+    "controls": [
+      {
+        "prop": "size",
+        "control": "segmented",
+        "label": "size",
+        "options": [
+          "sm",
+          "md",
+          "lg",
+          "xl"
+        ],
+        "defaultValue": "xl"
+      },
+      {
+        "prop": "speed",
+        "control": "slider",
+        "label": "speed",
+        "min": 0.5,
+        "max": 2,
+        "step": 0.25,
+        "defaultValue": 1
+      },
+      {
+        "prop": "motion",
+        "control": "segmented",
+        "label": "motion",
+        "options": [
+          "auto",
+          "reduced",
+          "full"
+        ],
+        "defaultValue": "auto"
+      },
+      {
+        "prop": "showLabel",
+        "control": "switch",
+        "label": "showLabel",
+        "defaultValue": true
+      },
+      {
+        "prop": "label",
+        "control": "text",
+        "label": "label",
+        "defaultValue": "Running the panel"
+      }
+    ],
+    "examples": [
+      {
+        "id": "lab-panel",
+        "title": "While a panel runs",
+        "description": "The helix belongs to the lab: a result is being computed, not fetched. Say what is running and how long it usually takes.",
+        "code": "import { HelixLoader } from \"@/components/zoblocks/helix-loader\";\n\nexport default function Example() {\n  return (\n    <HelixLoader\n      showLabel\n      label=\"Running the panel\"\n      hint=\"Results usually arrive within a minute.\"\n    />\n  );\n}"
+      },
+      {
+        "id": "slow-with-a-way-out",
+        "title": "A slow wait with a way out",
+        "description": "slowAfter swaps the hint for a plain statement of the stall. slowHint replaces the wording and actions gives the reader something to do about it.",
+        "code": "import { HelixLoader } from \"@/components/zoblocks/helix-loader\";\n\nexport default function Example() {\n  return (\n    <HelixLoader\n      showLabel\n      label=\"Running the panel\"\n      slowAfter={3000}\n      slowHint=\"The analyser is slower than usual. You can leave this page; the result will be filed.\"\n      actions={<button type=\"button\">Leave this page</button>}\n    />\n  );\n}"
+      },
+      {
+        "id": "sizes",
+        "title": "Four sizes",
+        "description": "Named steps for the common cases; a number sets the art width in pixels for anything else.",
+        "code": "import { HelixLoader } from \"@/components/zoblocks/helix-loader\";\n\nexport default function Example() {\n  return (\n    <div style={{ display: \"flex\", alignItems: \"center\", gap: 32 }}>\n      <HelixLoader size=\"sm\" label=\"Running\" />\n      <HelixLoader size=\"md\" label=\"Running\" />\n      <HelixLoader size=\"lg\" label=\"Running\" />\n      <HelixLoader size=\"xl\" label=\"Running\" />\n    </div>\n  );\n}"
+      }
+    ]
   },
   {
     "name": "infusion-loader",
@@ -8831,7 +9712,82 @@ export const CATALOG: ComponentDoc[] = [
       "clsx",
       "tailwind-merge"
     ],
-    "install": "npx @zoblocks/cli add infusion-loader"
+    "install": "npx @zoblocks/cli add infusion-loader",
+    "controls": [
+      {
+        "prop": "size",
+        "control": "segmented",
+        "label": "size",
+        "options": [
+          "sm",
+          "md",
+          "lg",
+          "xl"
+        ],
+        "defaultValue": "xl"
+      },
+      {
+        "prop": "progress",
+        "control": "slider",
+        "label": "progress",
+        "min": 0,
+        "max": 100,
+        "step": 1,
+        "defaultValue": 62
+      },
+      {
+        "prop": "speed",
+        "control": "slider",
+        "label": "speed",
+        "min": 0.5,
+        "max": 2,
+        "step": 0.25,
+        "defaultValue": 1
+      },
+      {
+        "prop": "motion",
+        "control": "segmented",
+        "label": "motion",
+        "options": [
+          "auto",
+          "reduced",
+          "full"
+        ],
+        "defaultValue": "auto"
+      },
+      {
+        "prop": "showLabel",
+        "control": "switch",
+        "label": "showLabel",
+        "defaultValue": true
+      },
+      {
+        "prop": "label",
+        "control": "text",
+        "label": "label",
+        "defaultValue": "Importing records"
+      }
+    ],
+    "examples": [
+      {
+        "id": "known-progress",
+        "title": "Known progress",
+        "description": "A number from 0 to 100 makes the loader determinate: role=progressbar with a value, rather than a status that is re-announced.",
+        "code": "import { InfusionLoader } from \"@/components/zoblocks/infusion-loader\";\n\nexport default function Example() {\n  return <InfusionLoader showLabel label=\"Importing records\" progress={62} />;\n}"
+      },
+      {
+        "id": "live-import",
+        "title": "Progress from your import",
+        "description": "The application owns progress; the loader only renders it. Feed it the real count, and drop progress when the total is not known yet.",
+        "code": "import { useEffect, useState } from \"react\";\nimport { InfusionLoader } from \"@/components/zoblocks/infusion-loader\";\n\nexport default function Example() {\n  const [done, setDone] = useState(0);\n  const total = 240;\n\n  useEffect(() => {\n    const id = setInterval(() => setDone((n) => (n >= total ? 0 : n + 12)), 400);\n    return () => clearInterval(id);\n  }, []);\n\n  return (\n    <InfusionLoader\n      showLabel\n      label={`Importing ${done} of ${total} records`}\n      progress={(done / total) * 100}\n    />\n  );\n}"
+      },
+      {
+        "id": "before-the-total",
+        "title": "Before the total is known",
+        "description": "Without progress the line runs indeterminate. Switch to a number as soon as one exists, rather than inventing one.",
+        "code": "import { InfusionLoader } from \"@/components/zoblocks/infusion-loader\";\n\nexport default function Example() {\n  return <InfusionLoader showLabel label=\"Preparing the export\" />;\n}"
+      }
+    ]
   },
   {
     "name": "provenance-chip",
@@ -9680,6 +10636,81 @@ export const CATALOG: ComponentDoc[] = [
       "tailwind-merge"
     ],
     "install": "npx @zoblocks/cli add pulse-loader",
+    "controls": [
+      {
+        "prop": "size",
+        "control": "segmented",
+        "label": "size",
+        "options": [
+          "sm",
+          "md",
+          "lg",
+          "xl"
+        ],
+        "defaultValue": "xl"
+      },
+      {
+        "prop": "bpm",
+        "control": "slider",
+        "label": "bpm",
+        "min": 40,
+        "max": 100,
+        "step": 5,
+        "defaultValue": 60
+      },
+      {
+        "prop": "speed",
+        "control": "slider",
+        "label": "speed",
+        "min": 0.5,
+        "max": 2,
+        "step": 0.25,
+        "defaultValue": 1
+      },
+      {
+        "prop": "motion",
+        "control": "segmented",
+        "label": "motion",
+        "options": [
+          "auto",
+          "reduced",
+          "full"
+        ],
+        "defaultValue": "auto"
+      },
+      {
+        "prop": "showLabel",
+        "control": "switch",
+        "label": "showLabel",
+        "defaultValue": true
+      },
+      {
+        "prop": "label",
+        "control": "text",
+        "label": "label",
+        "defaultValue": "Loading your records"
+      }
+    ],
+    "examples": [
+      {
+        "id": "region-overlay",
+        "title": "Over a region, never flashing",
+        "description": "Overlay covers its positioned ancestor, not the page. With delay a response that lands inside 200ms never shows the loader at all, and minDuration keeps one that did appear from blinking out.",
+        "code": "import { PulseLoader } from \"@/components/zoblocks/pulse-loader\";\n\nexport default function Example() {\n  return (\n    <section style={{ position: \"relative\", minHeight: 220 }}>\n      <ResultsTable />\n      <PulseLoader mode=\"overlay\" label=\"Loading results\" delay={200} minDuration={400} />\n    </section>\n  );\n}"
+      },
+      {
+        "id": "slow-wait",
+        "title": "A wait that admits it stalled",
+        "description": "After slowAfter the hint changes to a plain statement that the wait is long, and actions gives the reader a way out. onSlow fires once, so the stall can be reported as well as shown.",
+        "code": "import { PulseLoader } from \"@/components/zoblocks/pulse-loader\";\n\nexport default function Example() {\n  return (\n    <PulseLoader\n      showLabel\n      label=\"Loading your records\"\n      slowAfter={3000}\n      onSlow={() => reportSlowWait(\"records\")}\n      actions={<button type=\"button\">Go back</button>}\n    />\n  );\n}"
+      },
+      {
+        "id": "below-forty",
+        "title": "Below 40px it becomes the rhythm line",
+        "description": "The heart's detail collapses under 40px, so the loader renders Rhythm Loader instead rather than a smudge. Same props, same announcement.",
+        "code": "import { PulseLoader } from \"@/components/zoblocks/pulse-loader\";\n\nexport default function Example() {\n  return (\n    <div style={{ display: \"flex\", alignItems: \"center\", gap: 32 }}>\n      <PulseLoader size=\"sm\" label=\"Loading\" />\n      <PulseLoader size=\"md\" label=\"Loading\" />\n      <PulseLoader size=\"lg\" label=\"Loading\" />\n      <PulseLoader size=\"xl\" label=\"Loading\" />\n    </div>\n  );\n}"
+      }
+    ],
     "relationships": {
       "builtWith": [
         "rhythm-loader"
@@ -10665,7 +11696,193 @@ export const CATALOG: ComponentDoc[] = [
       "tailwind-merge",
       "@zoblocks/recorder-core"
     ],
-    "install": "npx @zoblocks/cli add recorder"
+    "install": "npx @zoblocks/cli add recorder",
+    "controls": [
+      {
+        "prop": "variant",
+        "control": "select",
+        "label": "Art",
+        "options": [
+          "pulse",
+          "bars",
+          "strip",
+          "duet",
+          "stream"
+        ],
+        "defaultValue": "bars"
+      },
+      {
+        "prop": "phase",
+        "control": "select",
+        "label": "Phase",
+        "options": [
+          "idle",
+          "requesting",
+          "armed",
+          "recording",
+          "paused",
+          "stopping",
+          "held",
+          "uploading",
+          "queued",
+          "transcribing",
+          "ready"
+        ],
+        "defaultValue": "recording"
+      },
+      {
+        "prop": "sensitivity",
+        "control": "segmented",
+        "label": "Sensitivity",
+        "options": [
+          "routine",
+          "confidential",
+          "restricted"
+        ],
+        "defaultValue": "routine"
+      },
+      {
+        "prop": "motion",
+        "control": "segmented",
+        "label": "Motion",
+        "options": [
+          "auto",
+          "reduced",
+          "full"
+        ],
+        "defaultValue": "auto"
+      },
+      {
+        "prop": "onPause",
+        "control": "event",
+        "label": "onPause"
+      },
+      {
+        "prop": "onStop",
+        "control": "event",
+        "label": "onStop"
+      },
+      {
+        "prop": "onSend",
+        "control": "event",
+        "label": "onSend"
+      },
+      {
+        "prop": "onMark",
+        "control": "event",
+        "label": "onMark"
+      },
+      {
+        "prop": "onStrike",
+        "control": "event",
+        "label": "onStrike"
+      },
+      {
+        "prop": "onFault",
+        "control": "event",
+        "label": "onFault"
+      }
+    ],
+    "examples": [
+      {
+        "id": "recording",
+        "title": "Capturing, and nothing owns a clock",
+        "description": "Peak buckets at 30 Hz, newest at the right, read from a declared source exactly as an AnalyserNode would be. Take the signal away with the switch and the art stops — the centre hairline is true zero, so a bar touching it means nothing is arriving.",
+        "group": "Capture",
+        "code": "<Recorder\n  variant=\"bars\"\n  phase=\"recording\"\n  source={analyser}\n  device={{ deviceId: \"jabra\", label: \"Jabra Link 380\" }}\n  expectedDevice={{ deviceId: \"jabra\", label: \"Jabra Link 380\" }}\n  context=\"Encounter · Room 4\"\n  onPause={pause}\n  onStop={stop}\n/>"
+      },
+      {
+        "id": "console",
+        "title": "The full encounter surface",
+        "description": "Consent, participants, device, level, markers and mid-session redaction, assembled. Not a sixth art — bars with the host's own regions around it. Mark and strike add markers to the take.",
+        "group": "Capture",
+        "code": "<Recorder\n  variant=\"bars\"\n  phase=\"recording\"\n  source={analyser}\n  device={device}\n  expectedDevice={device}\n  markers={markers}\n  onMark={() => addMarker(\"Mark\")}\n  onStrike={() => addMarker(\"Struck 0:30\", { struck: true })}\n/>"
+      },
+      {
+        "id": "single-control",
+        "title": "One control, at 44px",
+        "description": "Is it recording — the dot and its shape — and is it hearing me — the rings. The only art that keeps a real level meter at thumb size, which a phone or a patient-facing surface needs.",
+        "group": "Capture",
+        "code": "<Recorder variant=\"pulse\" phase=\"recording\" source={analyser} />"
+      },
+      {
+        "id": "dictation",
+        "title": "Inline dictation",
+        "description": "Forty pixels tall inside a note field, and still a real level meter rather than a static glyph. It refuses to start a restricted recording: a control this quiet is not where a disclosure begins.",
+        "group": "Capture",
+        "code": "<Recorder\n  variant=\"strip\"\n  phase=\"recording\"\n  source={analyser}\n  context=\"History of presenting complaint\"\n  onSend={insertIntoNote}\n/>"
+      },
+      {
+        "id": "muted",
+        "title": "Microphone muted",
+        "description": "Digital silence, arriving on schedule. A timer-driven waveform looks identical here to one with speech behind it; this one stops, and once the silence budget runs out it says which fault it is. The demo's budget is three seconds rather than twenty.",
+        "group": "When it is lying",
+        "code": "<Recorder\n  variant=\"bars\"\n  phase=\"recording\"\n  source={analyser}\n  track={{ readyState: \"live\", muted: true }}\n  silenceBudgetMs={20_000}\n  onFault={(fault) => fault && report(fault.code)}\n/>"
+      },
+      {
+        "id": "device-lost",
+        "title": "Device lost",
+        "description": "The track ended. Not silence — absence. The recording so far is intact and held, which is the distinction that keeps a pipeline from throwing away the expensive artefact.",
+        "group": "When it is lying",
+        "code": "<Recorder\n  variant=\"bars\"\n  phase=\"held\"\n  source={analyser}\n  track={{ readyState: \"ended\", muted: false }}\n/>"
+      },
+      {
+        "id": "wrong-device",
+        "title": "Recording the wrong microphone",
+        "description": "A headset user with the laptop mic live produces plausible room tone and passes every signal check. Caught by comparing the delivering device against the chosen one — which is why the name is rendered, not filed in a settings panel.",
+        "group": "When it is lying",
+        "code": "<Recorder\n  variant=\"bars\"\n  phase=\"recording\"\n  source={analyser}\n  device={{ deviceId: \"builtin\", label: \"MacBook Pro Microphone\" }}\n  expectedDevice={{ deviceId: \"jabra\", label: \"Jabra Link 380\" }}\n/>"
+      },
+      {
+        "id": "no-consent",
+        "title": "Armed, awaiting consent",
+        "description": "Armed is not idle: permission granted, device chosen, nothing captured, no basis recorded. The engine refuses the edge to recording; the surface says why.",
+        "group": "When it is lying",
+        "code": "<Recorder variant=\"bars\" phase=\"armed\" consent={null} />"
+      },
+      {
+        "id": "held",
+        "title": "Held, not yet uploaded",
+        "description": "The state every thin MediaRecorder wrapper skips. The bytes exist on this device and nobody else has them; a tick here would be a falsehood about a legal record. The upload resumes by byte range from 62%.",
+        "group": "When it is lying",
+        "code": "<Recorder\n  variant=\"bars\"\n  phase=\"held\"\n  disposition={{ state: \"failed\", bytes: 14_200_000, sent: 8_900_000, error: \"network\" }}\n/>"
+      },
+      {
+        "id": "disposition",
+        "title": "Where the recording is",
+        "description": "The companion strip, stepped through held, uploading, transcribing, ready and failed. While held there is no progress bar, because nothing is moving and a bar creeping forward would invent it.",
+        "group": "When it is lying",
+        "code": "<RecorderDispositionStrip\n  disposition={{ state: \"uploading\", bytes: 14_200_000, sent: 8_900_000 }}\n  durationMs={252_000}\n  onRetry={retryUpload}\n/>"
+      },
+      {
+        "id": "duet",
+        "title": "Playback with speakers",
+        "description": "The axis carries the speaker, so talk-time balance reads without reading anything. Position is the channel, not colour: the two accents sit within 2:1 in luminance.",
+        "group": "Reviewing a take",
+        "code": "<Recorder\n  variant=\"duet\"\n  phase=\"ready\"\n  peaks={peaks}\n  speakers={speakers}\n  position={0.44}\n  durationMs={754_000}\n  speakerLabels={[\"Dr Okafor\", \"Patient\"]}\n  title=\"Consultation — 14 Aug, 09:12\"\n  markers={markers}\n/>"
+      },
+      {
+        "id": "duet-no-speakers",
+        "title": "Playback without diarisation",
+        "description": "Peaks but no speaker byte: one rail, and it says so. It does not guess — a reader who trusts the axis would read the patient's words as the clinician's.",
+        "group": "Reviewing a take",
+        "code": "<Recorder variant=\"duet\" phase=\"ready\" peaks={peaks} speakers={null} durationMs={754_000} />"
+      },
+      {
+        "id": "transcript",
+        "title": "Live transcript",
+        "description": "The accessible equivalent of every waveform here. The last token is drawn as a guess because the recogniser may take it back; committing an interim result and then rewriting it loses a clinician in thirty seconds.",
+        "group": "Transcript",
+        "code": "<Recorder variant=\"stream\" phase=\"recording\" turns={turns} />"
+      },
+      {
+        "id": "stalled",
+        "title": "Transcript stalled",
+        "description": "Past four seconds of recogniser lag it says the transcript stalled — and that the audio is still arriving. The recogniser is behind, not the recorder, and the status says which.",
+        "group": "Transcript",
+        "code": "<Recorder variant=\"stream\" phase=\"recording\" turns={turns} transcriptLagMs={lagMs} />"
+      }
+    ]
   },
   {
     "name": "result-value",
@@ -11390,6 +12607,81 @@ export const CATALOG: ComponentDoc[] = [
       "tailwind-merge"
     ],
     "install": "npx @zoblocks/cli add rhythm-loader",
+    "controls": [
+      {
+        "prop": "size",
+        "control": "segmented",
+        "label": "size",
+        "options": [
+          "sm",
+          "md",
+          "lg",
+          "xl"
+        ],
+        "defaultValue": "lg"
+      },
+      {
+        "prop": "bpm",
+        "control": "slider",
+        "label": "bpm",
+        "min": 40,
+        "max": 100,
+        "step": 5,
+        "defaultValue": 60
+      },
+      {
+        "prop": "speed",
+        "control": "slider",
+        "label": "speed",
+        "min": 0.5,
+        "max": 2,
+        "step": 0.25,
+        "defaultValue": 1
+      },
+      {
+        "prop": "motion",
+        "control": "segmented",
+        "label": "motion",
+        "options": [
+          "auto",
+          "reduced",
+          "full"
+        ],
+        "defaultValue": "auto"
+      },
+      {
+        "prop": "showLabel",
+        "control": "switch",
+        "label": "showLabel",
+        "defaultValue": true
+      },
+      {
+        "prop": "label",
+        "control": "text",
+        "label": "label",
+        "defaultValue": "Loading results"
+      }
+    ],
+    "examples": [
+      {
+        "id": "in-a-button",
+        "title": "Inside a button",
+        "description": "At sm the strip fits a line of text. The button keeps its own label and sets aria-busy; the loader's label stays visually hidden so the wait is announced once.",
+        "code": "import { RhythmLoader } from \"@/components/zoblocks/rhythm-loader\";\n\nexport default function Example() {\n  return (\n    <button type=\"button\" aria-busy=\"true\" disabled>\n      <RhythmLoader size=\"sm\" label=\"Saving the note\" />\n      Saving\n    </button>\n  );\n}"
+      },
+      {
+        "id": "cadence",
+        "title": "Cadence is a prop, and clamped",
+        "description": "bpm runs from 40 to 100 and anything outside is clamped, so the fastest sweep stays well under the three-flash limit. The rate is decorative: it is never a patient's.",
+        "code": "import { RhythmLoader } from \"@/components/zoblocks/rhythm-loader\";\n\nexport default function Example() {\n  return (\n    <div style={{ display: \"flex\", gap: 40 }}>\n      <RhythmLoader bpm={40} showLabel label=\"40 bpm\" />\n      <RhythmLoader bpm={60} showLabel label=\"60 bpm\" />\n      <RhythmLoader bpm={100} showLabel label=\"100 bpm\" />\n    </div>\n  );\n}"
+      },
+      {
+        "id": "reduced-motion",
+        "title": "Reduced motion is a designed state",
+        "description": "The default follows the operating system. Reduced draws the full strip and breathes it in opacity; nothing travels. Full opts out of the preference and should be rare.",
+        "code": "import { RhythmLoader } from \"@/components/zoblocks/rhythm-loader\";\n\nexport default function Example() {\n  return (\n    <div style={{ display: \"flex\", gap: 40 }}>\n      <RhythmLoader motion=\"full\" showLabel label=\"Full motion\" />\n      <RhythmLoader motion=\"reduced\" showLabel label=\"Reduced motion\" />\n    </div>\n  );\n}"
+      }
+    ],
     "relationships": {
       "builtWith": [],
       "usedIn": [
@@ -11999,6 +13291,25 @@ export const CATALOG: ComponentDoc[] = [
       "tailwind-merge"
     ],
     "install": "npx @zoblocks/cli add safety-plan",
+    "controls": [
+      {
+        "prop": "pinCrisisStep",
+        "control": "switch",
+        "label": "Pin crisis step",
+        "defaultValue": true
+      },
+      {
+        "prop": "density",
+        "control": "segmented",
+        "label": "Density",
+        "options": [
+          "patient",
+          "standard",
+          "clinical"
+        ],
+        "defaultValue": "patient"
+      }
+    ],
     "relationships": {
       "builtWith": [
         "accordion"
@@ -12985,7 +14296,262 @@ export const CATALOG: ComponentDoc[] = [
       "clsx",
       "tailwind-merge"
     ],
-    "install": "npx @zoblocks/cli add switch"
+    "install": "npx @zoblocks/cli add switch",
+    "controls": [
+      {
+        "prop": "size",
+        "control": "segmented",
+        "label": "size",
+        "options": [
+          "micro",
+          "small",
+          "default",
+          "large"
+        ],
+        "defaultValue": "large"
+      },
+      {
+        "prop": "appearance",
+        "control": "select",
+        "label": "appearance",
+        "options": [
+          "switch",
+          "labeled",
+          "segmented",
+          "chip",
+          "row"
+        ],
+        "defaultValue": "switch"
+      },
+      {
+        "prop": "tone",
+        "control": "segmented",
+        "label": "tone",
+        "options": [
+          "affirmative",
+          "neutral",
+          "caution",
+          "critical"
+        ],
+        "defaultValue": "caution"
+      },
+      {
+        "prop": "stateLabels",
+        "control": "select",
+        "label": "stateLabels",
+        "options": [
+          "on-off",
+          "yes-no",
+          "active-inactive",
+          "in-effect",
+          "allowed-blocked",
+          "given-declined",
+          "enabled-disabled"
+        ],
+        "defaultValue": "in-effect"
+      },
+      {
+        "prop": "labelPlacement",
+        "control": "segmented",
+        "label": "labelPlacement",
+        "options": [
+          "start",
+          "end"
+        ],
+        "defaultValue": "end"
+      },
+      {
+        "prop": "commit",
+        "control": "segmented",
+        "label": "commit",
+        "options": [
+          "instant",
+          "deferred"
+        ],
+        "defaultValue": "instant"
+      },
+      {
+        "prop": "audience",
+        "control": "segmented",
+        "label": "audience",
+        "options": [
+          "clinician",
+          "patient"
+        ],
+        "defaultValue": "clinician"
+      },
+      {
+        "prop": "showState",
+        "control": "switch",
+        "label": "showState",
+        "defaultValue": true
+      },
+      {
+        "prop": "loading",
+        "control": "switch",
+        "label": "loading",
+        "defaultValue": false
+      },
+      {
+        "prop": "readOnly",
+        "control": "switch",
+        "label": "readOnly",
+        "defaultValue": false
+      },
+      {
+        "prop": "disabled",
+        "control": "switch",
+        "label": "disabled",
+        "defaultValue": false
+      },
+      {
+        "prop": "label",
+        "control": "text",
+        "label": "label",
+        "defaultValue": "Contact precautions"
+      },
+      {
+        "prop": "description",
+        "control": "text",
+        "label": "description",
+        "defaultValue": "Gown and gloves on entry."
+      }
+    ],
+    "examples": [
+      {
+        "id": "anatomy-matrix",
+        "title": "Size, value and availability, independent",
+        "description": "The specimen sheet this component started from. Read-only is a dashed border and a filled thumb — a different object, not a weaker one, because dimming reads as “inactive”, which is a value rather than an availability.",
+        "group": "Anatomy",
+        "code": "import { Switch } from \"@/components/zoblocks/switch\";\n\nconst ROWS = [\n  {},\n  { appearance: \"labeled\", stateLabels: \"active-inactive\" },\n  { readOnly: true },\n  { disabled: true },\n] as const;\n\nexport default function Example() {\n  return ROWS.map((row, i) => (\n    <div key={i} style={{ display: \"flex\", gap: 24 }}>\n      <Switch label=\"Label\" size=\"large\" checked={false} showState={false} {...row} />\n      <Switch label=\"Label\" size=\"large\" checked showState={false} {...row} />\n      <Switch label=\"Label\" checked={false} showState={false} {...row} />\n      <Switch label=\"Label\" checked showState={false} {...row} />\n    </div>\n  ));\n}"
+      },
+      {
+        "id": "without-colour",
+        "title": "State without colour",
+        "description": "On-track and off-track sit within about 1.2:1 of each other in relative luminance, so in monochrome and forced colours the fill carries nothing. Thumb position, thumb glyph and the state word each have to be enough alone.",
+        "group": "Anatomy",
+        "code": "<div style={{ display: \"flex\", gap: 32, filter: \"grayscale(1)\" }}>\n  <Switch label=\"Off\" checked={false} />\n  <Switch label=\"On\" checked />\n  <Switch label=\"Advance directive\" checked=\"unknown\" absentReason=\"not-collected\" />\n  <Switch label=\"Contact precautions\" checked readOnly />\n</div>"
+      },
+      {
+        "id": "labeled-track",
+        "title": "A labelled track that holds its width",
+        "description": "“Active” and “Inactive” are laid into the same grid cell, so the track is sized by the longer word and the thumb travel is constant. A switch that resizes as it toggles makes a whole table row jump.",
+        "group": "Anatomy",
+        "code": "<Switch\n  label=\"Interpreter required\"\n  appearance=\"labeled\"\n  stateLabels=\"active-inactive\"\n  size=\"large\"\n  defaultChecked\n/>"
+      },
+      {
+        "id": "write-and-fail",
+        "title": "The write, and the write that fails",
+        "description": "A switch is a request, not a change. Pass onCommit a promise: the first control saves; the second fails every other attempt, and animates back to the value the record actually holds and says so.",
+        "group": "The write",
+        "code": "import { useState } from \"react\";\nimport { Switch } from \"@/components/zoblocks/switch\";\n\nexport default function Example() {\n  const [precautions, setPrecautions] = useState(false);\n  return (\n    <Switch\n      label=\"Contact precautions\"\n      stateLabels=\"in-effect\"\n      tone=\"caution\"\n      size=\"large\"\n      checked={precautions}\n      onCommit={async (next) => {\n        // Throwing reverts the switch and announces what the record holds.\n        await api.setPrecautions({ encounter, contact: next });\n        setPrecautions(next);\n      }}\n    />\n  );\n}"
+      },
+      {
+        "id": "every-phase",
+        "title": "Every phase, by hand",
+        "description": "The escape hatch for a caller that already owns a state machine — a mutation library, a websocket, an offline queue. Supplying phase takes the internal machine out of the loop and renders exactly what it would have.",
+        "group": "The write",
+        "code": "<Switch\n  label=\"Contact precautions\"\n  description=\"Gown and gloves on entry.\"\n  stateLabels=\"in-effect\"\n  tone=\"caution\"\n  size=\"large\"\n  checked\n  phase={mutation.phase} // \"idle\" | \"pending\" | \"committed\" | \"reverted\" | \"blocked\" | \"queued\" | \"stale\"\n  error={mutation.phase === \"reverted\" ? \"Could not reach the record.\" : undefined}\n/>"
+      },
+      {
+        "id": "offline-and-overtaken",
+        "title": "Offline, and overtaken",
+        "description": "Queued is not pending: nothing has been sent, and the user may still change their mind. A conflict offers both readings and pre-selects neither, because each clinician had a reason.",
+        "group": "The write",
+        "code": "<Switch\n  label=\"Falls risk\"\n  stateLabels=\"in-effect\"\n  size=\"large\"\n  checked={fallsRisk}\n  online={isOnline}\n  onCommit={setFallsRisk}\n/>\n\n<Switch\n  label=\"Contact precautions\"\n  stateLabels=\"in-effect\"\n  tone=\"caution\"\n  size=\"large\"\n  checked={mine}\n  serverValue={theirs} // somebody else's write, if it landed under yours\n  onCommit={setMine}\n  onResolveConflict={(keep) => keep === \"theirs\" && setMine(theirs)}\n/>"
+      },
+      {
+        "id": "time-boxed",
+        "title": "An on that is not forever",
+        "description": "Turn it on and watch the window close — then note the switch is still on. It reports the lapse and waits, because a client clock deciding to lift a clinical flag is a defect.",
+        "group": "The write",
+        "code": "<Switch\n  label=\"Nil by mouth\"\n  description=\"Set for theatre. Shows on the bed board, the diet list and the handover.\"\n  stateLabels=\"in-effect\"\n  tone=\"caution\"\n  size=\"large\"\n  checked={npo}\n  now={serverTime}\n  until=\"2026-08-16T13:00:12.000Z\"\n  untilWarnMs={6000}\n  onCommit={setNpo}\n  onExpire={() => reviewNpo(patient)}\n/>"
+      },
+      {
+        "id": "deferred",
+        "title": "A switch inside a form",
+        "description": "A switch means applied now. When it is not — a form that commits on submit — it has to say so. Toggle these and an unsaved marker appears rather than a write.",
+        "group": "The write",
+        "code": "<form onSubmit={save}>\n  <Switch\n    label=\"Text me when my results are ready\"\n    description=\"Saved when you submit the form.\"\n    stateLabels=\"enabled-disabled\"\n    commit=\"deferred\"\n    size=\"large\"\n    defaultChecked={false}\n  />\n  <Switch\n    label=\"Share my records with my GP\"\n    stateLabels=\"given-declined\"\n    commit=\"deferred\"\n    size=\"large\"\n    defaultChecked={false}\n  />\n</form>"
+      },
+      {
+        "id": "absence",
+        "title": "Off, and never asked",
+        "description": "Four switches in the same visual state saying four different things — the word changes, not the colour. “Declined” is a recorded clinical act, not an absence.",
+        "group": "What it means",
+        "code": "<Switch label=\"Advance directive\" checked=\"unknown\" absentReason=\"not-collected\" stateLabels=\"yes-no\" />\n<Switch label=\"Interpreter needed\" checked=\"unknown\" absentReason=\"declined\" stateLabels=\"yes-no\" />\n<Switch label=\"Substance use screen\" checked=\"unknown\" absentReason=\"masked\" readOnly stateLabels=\"yes-no\" />\n<Switch label=\"MRSA screen\" checked=\"unknown\" absentReason=\"pending\" stateLabels=\"yes-no\" />"
+      },
+      {
+        "id": "tones",
+        "title": "When on is the dangerous state",
+        "description": "Half the switches in a clinical system are suppressions. All four are on; only the middle two are situations anyone needs to know about, and the colour, glyph and state word all say so.",
+        "group": "What it means",
+        "code": "<Switch label=\"Allergy interaction checking\" stateLabels=\"enabled-disabled\" checked />\n<Switch label=\"Suppress duplicate-therapy alerts\" tone=\"caution\" stateLabels=\"in-effect\" checked />\n<Switch label=\"Bypass allergy check for this order\" tone=\"critical\" stateLabels=\"allowed-blocked\" checked />\n<Switch label=\"Show archived encounters\" tone=\"neutral\" checked />"
+      },
+      {
+        "id": "locked",
+        "title": "Locked, and why",
+        "description": "Disabled takes a control out of the tab order, so a screen-reader user never learns it exists. Read-only keeps it reachable and says what is holding it. Only the last is genuinely disabled.",
+        "group": "What it means",
+        "code": "<Switch\n  label=\"Contact precautions\"\n  stateLabels=\"in-effect\"\n  checked\n  readOnly\n  lockedReason=\"Encounter signed 14:32 by Dr Okafor.\"\n/>\n<Switch\n  label=\"Change diet order\"\n  stateLabels=\"allowed-blocked\"\n  checked={false}\n  readOnly\n  lockedReason=\"Your role cannot change this.\"\n/>\n<Switch label=\"Notify by SMS\" stateLabels=\"enabled-disabled\" checked disabled />"
+      },
+      {
+        "id": "confirm",
+        "title": "Friction matched to consequence",
+        "description": "Chosen by what the toggle costs if nobody meant it. Hold is a timed input, so activate any of these from the keyboard and the dialog opens instead — holding is never the only path.",
+        "group": "What it means",
+        "code": "<Switch label=\"Suspend fall-risk alarm\" stateLabels=\"in-effect\" tone=\"critical\" confirm=\"hold\" onCommit={save} />\n\n<Switch\n  label=\"Discharge to home\"\n  stateLabels=\"active-inactive\"\n  confirm=\"dialog\"\n  confirmCopy={{\n    subject: \"Ada Lovelace\",\n    consequence: \"Closes the encounter and releases the bed. This cannot be undone.\",\n  }}\n  onCommit={save}\n/>\n\n<Switch label=\"Bypass allergy check for this order\" tone=\"critical\" confirm=\"attest\" onCommit={save} />\n\n<Switch\n  label=\"Release restraint order\"\n  tone=\"critical\"\n  confirm=\"countersign\"\n  countersign={{\n    role: \"registered-nurse\",\n    notSameAs: \"s.mehta\",\n    requestedBy: \"S. Mehta, RN\",\n    verify: () => auth.collectSecondIdentity(),\n  }}\n  onCommit={save}\n/>"
+      },
+      {
+        "id": "impact",
+        "title": "The consequence, before the click",
+        "description": "A switch whose consequences reach other people carries them where they inform the decision, not in a dialog after it — and says who last moved it, the first question anyone asks of a shared record.",
+        "group": "What it means",
+        "code": "<Switch\n  label=\"Add to the deteriorating-patient list\"\n  stateLabels=\"in-effect\"\n  tone=\"caution\"\n  size=\"large\"\n  impact={[\n    \"page the outreach team on call now\",\n    \"add a banner to the bed board, visible to visitors\",\n    \"set hourly observations for 24 hours\",\n  ]}\n  provenance={{ by: \"J. Adeyemi\", at: \"2026-08-16T06:40:00.000Z\", via: \"ward round\" }}\n  onCommit={save}\n/>"
+      },
+      {
+        "id": "panel",
+        "title": "A real panel",
+        "description": "Four rows, four different situations, none rendered as an ordinary off. The count reports “not asked” apart from off, because folding it in is the failure this component exists to prevent.",
+        "group": "What it means",
+        "code": "import { SwitchField, SwitchList } from \"@/components/zoblocks/switch\";\n\n<SwitchList\n  title=\"Isolation precautions\"\n  counts={{ on: 2, total: 4, unknown: 1 }}\n  provenance={{ by: \"S. Mehta\", at: \"2026-08-16T14:07:00.000Z\" }}\n>\n  <SwitchField label=\"Contact\" description=\"Gown and gloves on entry.\" stateLabels=\"in-effect\" tone=\"caution\" checked />\n  <SwitchField label=\"Droplet\" description=\"Surgical mask within two metres.\" stateLabels=\"in-effect\" tone=\"caution\" checked />\n  <SwitchField\n    label=\"Airborne\"\n    description=\"Negative-pressure room and N95.\"\n    stateLabels=\"in-effect\"\n    checked={false}\n    readOnly\n    lockedReason=\"No negative-pressure room available on this unit.\"\n  />\n  <SwitchField\n    label=\"Enteric\"\n    description=\"Dedicated commode; soap and water, not alcohol gel.\"\n    stateLabels=\"in-effect\"\n    checked=\"unknown\"\n    absentReason=\"not-collected\"\n  />\n</SwitchList>"
+      },
+      {
+        "id": "appearances",
+        "title": "One value, five renderings",
+        "description": "The same state model behind every one. Segmented is the only appearance that changes the ARIA role: two labelled cells that both look pressable are a radiogroup.",
+        "group": "Surfaces",
+        "code": "<Switch label=\"Interpreter required\" stateLabels=\"yes-no\" checked />\n<Switch label=\"Interpreter required\" appearance=\"labeled\" stateLabels=\"active-inactive\" checked />\n<Switch label=\"Interpreter required\" appearance=\"segmented\" stateLabels=\"yes-no\" checked />\n<Switch label=\"My patients\" appearance=\"chip\" checked />\n<Switch\n  label=\"Text me when my results are ready\"\n  description=\"To the mobile ending 4471. Standard rates apply.\"\n  appearance=\"row\"\n  audience=\"patient\"\n  checked\n/>"
+      },
+      {
+        "id": "sizes",
+        "title": "From a flowsheet row to a phone",
+        "description": "The pill shrinks; the target does not. Micro switches are 26×14px and still present a target at or above the 24px floor, because the hit area follows the density profile rather than the pill.",
+        "group": "Surfaces",
+        "code": "<td>\n  <Switch size=\"micro\" tone=\"caution\" checked={row.npo} showState={false} aria-label={\"Nil by mouth — \" + row.name} />\n</td>\n\n<Switch\n  label=\"Share my records with my GP\"\n  description=\"Your GP surgery can see your hospital notes. You can change this at any time.\"\n  appearance=\"row\"\n  audience=\"patient\"\n  checked\n/>"
+      },
+      {
+        "id": "antd-surface",
+        "title": "The Ant Design surface, unchanged",
+        "description": "Prop names, shapes and defaults match Ant Design's Switch, so a form migrates by changing an import. The one divergence is loading: it renders as pending and never disables, so focus is kept.",
+        "group": "Surfaces",
+        "code": "<Switch label=\"Interpreter required\" checkedChildren=\"Active\" unCheckedChildren=\"Inactive\" defaultChecked />\n<Switch label=\"Saving your preference\" loading checked />\n<Switch label=\"small\" size=\"small\" defaultChecked showState={false} />\n<Switch label=\"default\" defaultChecked showState={false} />\n<Switch label=\"large\" size=\"large\" defaultChecked showState={false} />"
+      },
+      {
+        "id": "restyled",
+        "title": "Restyled without a fork",
+        "description": "Tokens first, props second, slots last. All three are one component and one state model; only token values differ, so a brand restyles the control without editing its source.",
+        "group": "Surfaces",
+        "code": "<Switch label=\"Default tokens\" stateLabels=\"in-effect\" size=\"large\" checked />\n\n<div\n  style={{\n    \"--zb-switch-radius\": \"0.25rem\",\n    \"--zb-switch-track-on-bg\": \"#4338ca\",\n    \"--zb-switch-track-w\": \"64px\",\n  }}\n>\n  <Switch label=\"Squared, wider, another brand\" stateLabels=\"in-effect\" size=\"large\" checked />\n</div>\n\n<Switch\n  label=\"A custom thumb, through slots\"\n  stateLabels=\"in-effect\"\n  size=\"large\"\n  checked\n  slots={{ thumb: ({ value }) => (value === true ? \"✓\" : \"\") }}\n/>"
+      },
+      {
+        "id": "rtl",
+        "title": "Right to left",
+        "description": "The thumb travels on inset-inline-start and labelPlacement is start or end rather than left or right, so nothing is mirrored by hand. The last block sets dir=rtl on itself.",
+        "group": "Surfaces",
+        "code": "<Switch label=\"Label at the end (default)\" stateLabels=\"yes-no\" checked />\n<Switch label=\"Label at the start\" stateLabels=\"yes-no\" labelPlacement=\"start\" checked />\n\n<div dir=\"rtl\">\n  <Switch label=\"مترجم مطلوب\" stateLabels=\"yes-no\" checked />\n</div>"
+      }
+    ]
   },
   {
     "name": "timeline",
@@ -13260,6 +14826,35 @@ export const CATALOG: ComponentDoc[] = [
       "tailwind-merge"
     ],
     "install": "npx @zoblocks/cli add timeline",
+    "controls": [
+      {
+        "prop": "mode",
+        "control": "segmented",
+        "label": "Mode",
+        "options": [
+          "start",
+          "end",
+          "alternate"
+        ],
+        "defaultValue": "start"
+      },
+      {
+        "prop": "variant",
+        "control": "segmented",
+        "label": "Variant",
+        "options": [
+          "outlined",
+          "filled"
+        ],
+        "defaultValue": "outlined"
+      },
+      {
+        "prop": "reverse",
+        "control": "switch",
+        "label": "Newest first",
+        "defaultValue": false
+      }
+    ],
     "relationships": {
       "builtWith": [],
       "usedIn": [
@@ -14554,23 +16149,61 @@ export const CATALOG: ComponentDoc[] = [
       {
         "id": "consent-in-a-form",
         "title": "Consent inside an antd Form",
-        "description": "The common case. `signatureRequired()` treats a decline as a valid answer — a rule demanding outcome === \"signed\" would make refusal impossible to submit.",
+        "description": "The common case. Submit it empty and the field says so; decline and the form submits, because `signatureRequired()` treats a decline as a valid answer — a rule demanding outcome === \"signed\" would make refusal impossible to submit.",
         "fixture": "patientRoutine",
-        "code": "import { Form } from \"antd\";\nimport { Signature, signatureRequired } from \"@zoblocks/signature\";\nimport \"@zoblocks/signature/styles.css\";\n\n<Form.Item name=\"consent\" rules={[signatureRequired()]}>\n  <Signature\n    now={serverTime}\n    meaning=\"consent\"\n    attestation=\"I agree to the treatment described above.\"\n  />\n</Form.Item>;"
+        "group": "Capture",
+        "code": "import { Button, Form } from \"antd\";\nimport { Signature, signatureRequired } from \"@zoblocks/signature\";\nimport \"@zoblocks/signature/styles.css\";\n\n<Form layout=\"vertical\" onFinish={save}>\n  <Form.Item name=\"consent\" label=\"Patient signature\" rules={[signatureRequired()]}>\n    <Signature\n      now={serverTime}\n      meaning=\"consent\"\n      attestation=\"I agree to go ahead with the procedure.\"\n      subject={{ display: \"Randall, Josh\", reference: \"Patient/4471902\" }}\n      recordedBy={{ name: \"A. Okafor\", credential: \"RN\" }}\n      outcomes={[\"declined\", \"unable\"]}\n    />\n  </Form.Item>\n  <Button type=\"primary\" htmlType=\"submit\">Submit</Button>\n</Form>"
+      },
+      {
+        "id": "keyboard",
+        "title": "Signed with the keyboard alone",
+        "description": "Drawing is a path-dependent input, and WCAG 2.1.1 (Level A) requires the function behind it — recording assent — to work from a keyboard. The typed path is that mechanism, not a fallback. Tab in, type a name, confirm.",
+        "group": "Capture",
+        "code": "<Signature\n  now={serverTime}\n  meaning=\"consent\"\n  attestation=\"I agree to go ahead with the procedure.\"\n  methods={[\"type\"]}\n/>"
       },
       {
         "id": "refusal",
         "title": "The patient who refused to sign",
-        "description": "Seven outcomes, not two. A refusal and an unopened form are different clinical facts, and the union makes it impossible to record them the same way.",
+        "description": "Seven outcomes, not two. A refusal and an unopened form are different clinical facts, and the value is a union that makes it impossible to record them the same way. Unable and verbal both require a witness — the type says so, and so does the option text.",
         "fixture": "consentDeclined",
-        "code": "// The value is a discriminated union, so this compiles only if every\n// outcome is handled — including the three that are not \"signed\".\nswitch (value.outcome) {\n  case \"signed\":   return file(value.image, value.signedAt);\n  case \"declined\": return recordRefusal(value.reason, value.recordedAt);\n  case \"unable\":   return recordUnable(value.reason, value.witness); // witness is required\n  case \"verbal\":   return recordVerbal(value.witness);\n  case \"on-paper\": return awaitScan();\n  case \"pending\":  return null;\n  case \"revoked\":  return revoke(value.revokedAt);\n}"
+        "group": "When there is no signature",
+        "code": "<Signature\n  now={serverTime}\n  meaning=\"consent\"\n  attestation=\"I agree to go ahead with the procedure.\"\n  outcomes={[\"declined\", \"unable\", \"verbal\", \"on-paper\"]}\n  onChange={(value) => {\n    // A discriminated union: this compiles only if every outcome is handled,\n    // including the ones that are not \"signed\".\n    switch (value.outcome) {\n      case \"signed\":   return file(value.ink, value.recordedAt);\n      case \"declined\": return recordRefusal(value.reason, value.recordedAt);\n      case \"unable\":   return recordUnable(value.reason, value.witness);\n      case \"verbal\":   return recordVerbal(value.witness);\n      case \"on-paper\": return awaitScan();\n      case \"pending\":  return null;\n      case \"revoked\":  return revoke(value.revokedAt);\n    }\n  }}\n/>"
+      },
+      {
+        "id": "locked",
+        "title": "A submitted form stays legible",
+        "description": "Read-only, printable, and plain about what it is: the manifest states that a PNG of a mark is not a cryptographic signature — the row every other library omits.",
+        "group": "After signing",
+        "code": "<Signature now={serverTime} value={storedSignature} disabled />"
+      },
+      {
+        "id": "pending",
+        "title": "Awaiting countersignature",
+        "description": "Signed by the patient, waiting on the clinician. A form that is neither empty nor complete is the state a boolean cannot hold, and it is the normal case for anything that needs a countersignature.",
+        "group": "After signing",
+        "code": "<Signature\n  now={serverTime}\n  disabled\n  value={{\n    outcome: \"pending\",\n    awaiting: \"clinician\",\n    since: patientSignedAt,\n    soFar: [patientSignature],\n    recordedAt: patientSignedAt,\n    recordedBy: { name: \"A. Okafor\", credential: \"RN\" },\n  }}\n/>"
+      },
+      {
+        "id": "revoked",
+        "title": "Consent withdrawn, the original kept",
+        "description": "The original is struck through, not deleted. Consent given and later withdrawn is a different fact from consent never given, and both belong in the record.",
+        "group": "After signing",
+        "code": "<Signature\n  now={serverTime}\n  disabled\n  value={{\n    outcome: \"revoked\",\n    original: storedSignature,\n    revokedBy: { name: \"Josh Randall\" },\n    revokedAt: withdrawnAt,\n    reason: \"Changed their mind after speaking with their daughter.\",\n    recordedAt: withdrawnAt,\n    recordedBy: { name: \"A. Okafor\", credential: \"RN\" },\n  }}\n/>"
       },
       {
         "id": "provenance-bundle",
         "title": "What it emits, and why it is not a Consent",
-        "description": "Consent carries no signature element in R4 or R5 — only Provenance.signature does. The component emits a transaction Bundle so the two land together or not at all.",
+        "description": "Consent carries no signature element in R4 or R5 — only Provenance.signature does. So the component emits a transaction Bundle: the Consent and the Provenance that signs it, posted together or not at all.",
         "fixture": "provenanceConsent",
-        "code": "import { toFhirBundle } from \"@zoblocks/signature\";\nimport { patientRoutine } from \"@zoblocks/fixtures\";\n\n// A transaction Bundle: the Consent and the Provenance that signs it, posted\n// together or not at all. Emitting the Consent alone would store an agreement\n// with nothing proving anyone made it.\nconst bundle = toFhirBundle(value, {\n  release: \"R4\",\n  subject: {\n    display: \"Amara Okonkwo\",\n    reference: `Patient/${patientRoutine.id}`,\n  },\n});\n\n// bundle.entry[0] → POST Consent\n// bundle.entry[1] → POST Provenance, carrying Provenance.signature\n\n// The signer travels on the value, not in these options: who signed is part of\n// what was captured, and re-supplying it here would let the two disagree."
+        "group": "The record",
+        "code": "import { toFhirBundle } from \"@zoblocks/signature\";\n\nconst bundle = toFhirBundle(value, {\n  release: \"R4\",\n  subject: { display: \"Randall, Josh\", reference: \"Patient/4471902\" },\n});\n\n// bundle.entry[0] → POST Consent\n// bundle.entry[1] → POST Provenance, carrying Provenance.signature\n//\n// The signer travels on the value, not in these options: who signed is part\n// of what was captured, and re-supplying it here would let the two disagree."
+      },
+      {
+        "id": "ink-in-any-theme",
+        "title": "Stored ink, legible in any theme",
+        "description": "The ink is kept as strokes and drawn as SVG in currentColor, so a signature captured in light mode is still legible on a dark screen years later. A bitmap freezes the colour of the day it was taken.",
+        "group": "The record",
+        "code": "import { SignatureInk } from \"@zoblocks/signature\";\n\n// value.ink is what Signature captured; the colour comes from the surface.\n<div style={{ color: \"var(--zb-text)\" }}>\n  <SignatureInk ink={value.ink} label=\"Josh Randall's signature\" height={56} />\n</div>"
       }
     ],
     "fixtures": [
@@ -15325,6 +16958,7 @@ export const CATALOG: ComponentDoc[] = [
         "title": "Chart sections",
         "description": "The common case: a view switch over a patient chart, with a critical count on Labs that reaches the accessible name as a word.",
         "fixture": "patientRoutine",
+        "group": "Clinical",
         "code": "import { Tabs } from \"@zoblocks/tabs\";\nimport { allergyList, medicationList, observationPanel } from \"@zoblocks/fixtures\";\nimport \"@zoblocks/tabs/styles.css\";\n\nconst critical = observationPanel.filter(isCritical);\n\n<Tabs\n  as=\"tabs\"\n  aria-label=\"Chart sections\"\n  defaultValue=\"summary\"\n  items={[\n    { value: \"summary\", label: \"Summary\", children: <Summary /> },\n    {\n      value: \"labs\",\n      label: \"Labs\",\n      // Counted from the data, never typed in. A tone is a claim about the\n      // patient, so it has to come from the same place the panel does.\n      count: critical.length,\n      tone: critical.length ? \"critical\" : \"neutral\",\n      children: <Labs observations={observationPanel} />,\n    },\n    { value: \"meds\", label: \"Medications\", count: medicationList.length, children: <Meds /> },\n    { value: \"allergies\", label: \"Allergies\", count: allergyList.length, children: <Allergies /> },\n  ]}\n/>;"
       },
       {
@@ -15332,13 +16966,155 @@ export const CATALOG: ComponentDoc[] = [
         "title": "A section that is restricted, not absent",
         "description": "A disabled tab requires a reason. Omitting the section entirely would tell the clinician it does not exist; greying it silently tells them nothing.",
         "fixture": "patientRestricted",
+        "group": "Clinical",
         "code": "import { patientRestricted } from \"@zoblocks/fixtures\";\n\n<Tabs\n  as=\"tabs\"\n  aria-label=\"Chart sections\"\n  defaultValue=\"summary\"\n  items={[\n    { value: \"summary\", label: \"Summary\", children: <Summary /> },\n    {\n      value: \"bh\",\n      label: \"Behavioural health\",\n      disabled: true,\n      // Mandatory. aria-disabled, never the disabled attribute — a keyboard\n      // user has to be able to reach it to find out why they cannot open it.\n      disabledReason:\n        \"Restricted. Opening it records an access event and notifies the record owner.\",\n    },\n  ]}\n/>;"
+      },
+      {
+        "id": "segmented",
+        "title": "Segmented",
+        "description": "The control the whole system started from. The thumb is one transformed element, so it moves position and width together and never repaints the track. Click either half, or focus it and press ← / →.",
+        "group": "Variants",
+        "code": "import { Tabs } from \"@zoblocks/tabs\";\n\nexport default function Example() {\n  return (\n    <Tabs\n      as=\"tabs\"\n      variant=\"segmented\"\n      fill=\"equal\"\n      aria-label=\"Document scope\"\n      defaultValue=\"personal\"\n      items={[\n        { value: \"personal\", label: \"Personal\", children: <p>14 documents only you can see.</p> },\n        { value: \"shared\", label: \"Shared\", children: <p>6 documents shared with your care team.</p> },\n      ]}\n    />\n  );\n}"
+      },
+      {
+        "id": "segmented-rich",
+        "title": "Segmented with icons, counts and tone",
+        "description": "The count reads as a number, not a label: “Needs action, 3 abnormal”. Archive is aria-disabled rather than disabled, so a keyboard user can find it and learn why it is unavailable.",
+        "group": "Variants",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"segmented\"\n  aria-label=\"Inbox filter\"\n  defaultValue=\"all\"\n  items={[\n    { value: \"all\", label: \"All\", icon: <MailIcon />, count: 128, children: <Inbox filter=\"all\" /> },\n    { value: \"unread\", label: \"Unread\", icon: <BellIcon />, count: 12, children: <Inbox filter=\"unread\" /> },\n    {\n      value: \"action\",\n      label: \"Needs action\",\n      icon: <ShieldIcon />,\n      count: 3,\n      tone: \"high\",\n      children: <Inbox filter=\"action\" />,\n    },\n    {\n      value: \"archive\",\n      label: \"Archive\",\n      icon: <DocIcon />,\n      disabled: true,\n      disabledReason: \"Archive is disabled for this mailbox\",\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "underline",
+        "title": "Underline",
+        "description": "The workhorse: more than four items, labels of unequal length, panels that are whole screens. The rail is an inset shadow rather than a border, so the 2px indicator overlaps it exactly at any zoom.",
+        "group": "Variants",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"underline\"\n  aria-label=\"Order\"\n  defaultValue=\"summary\"\n  items={[\n    { value: \"summary\", label: \"Summary\", children: <OrderSummary /> },\n    { value: \"lines\", label: \"Line items\", count: 24, children: <LineItems /> },\n    { value: \"ship\", label: \"Shipments\", count: 3, children: <Shipments /> },\n    { value: \"returns\", label: \"Returns\", count: 1, tone: \"high\", children: <Returns /> },\n    { value: \"invoices\", label: \"Invoices\", children: <Invoices /> },\n    { value: \"audit\", label: \"Audit log\", children: <AuditLog /> },\n  ]}\n/>"
+      },
+      {
+        "id": "pill-filters",
+        "title": "Pill filters",
+        "description": "Pills are the only variant allowed to wrap, and only as a radiogroup — once a tablist wraps, “the next tab” stops being a direction. There is no indicator, because a line break leaves no path for one to travel along.",
+        "group": "Variants",
+        "code": "<Tabs\n  as=\"radiogroup\"\n  variant=\"pill\"\n  overflow=\"wrap\"\n  aria-label=\"Filter documents by type\"\n  defaultValue=\"all\"\n  items={[\n    { value: \"all\", label: \"Everything\", count: 241 },\n    { value: \"referrals\", label: \"Referrals\", icon: <DocIcon />, count: 38 },\n    { value: \"labs\", label: \"Lab reports\", icon: <FlaskIcon />, count: 96 },\n    { value: \"imaging\", label: \"Imaging\", icon: <ImageIcon />, count: 22 },\n    { value: \"consent\", label: \"Consent forms\", icon: <ShieldIcon />, count: 14 },\n    { value: \"letters\", label: \"Correspondence\", icon: <MailIcon />, count: 71 },\n  ]}\n/>"
+      },
+      {
+        "id": "enclosed-editable",
+        "title": "Enclosed, with add and close",
+        "description": "The × is aria-hidden and the keyboard path is Delete on the tab, because a control inside role=tab is invalid ARIA. After a close, focus moves to the neighbour — never to <body>.",
+        "group": "Variants",
+        "code": "import { useState } from \"react\";\nimport { Tabs } from \"@zoblocks/tabs\";\n\nexport default function Example() {\n  const [items, setItems] = useState([\n    { value: \"note\", label: \"Progress note\", icon: <NoteIcon />, dot: \"dirty\", closable: true },\n    { value: \"cmp\", label: \"CMP 2026-08-14\", icon: <FlaskIcon />, closable: true },\n    { value: \"ct\", label: \"CT abdomen\", icon: <ImageIcon />, closable: true },\n  ]);\n  const [value, setValue] = useState(\"note\");\n\n  return (\n    <Tabs\n      as=\"tabs\"\n      variant=\"enclosed\"\n      aria-label=\"Open documents\"\n      value={value}\n      onChange={setValue}\n      items={items.map((item) => ({ ...item, children: <Document id={item.value} /> }))}\n      editable={{\n        onClose: (target) => {\n          const index = items.findIndex((item) => item.value === target);\n          const rest = items.filter((item) => item.value !== target);\n          setItems(rest);\n          // Next, else previous: the rule the APG pattern leaves out.\n          if (value === target) setValue((rest[index] ?? rest[rest.length - 1])?.value ?? \"\");\n        },\n        onAdd: () => {\n          const next = \"new-\" + Date.now();\n          setItems((current) => [...current, { value: next, label: \"Untitled\", closable: true }]);\n          setValue(next);\n        },\n      }}\n    />\n  );\n}"
+      },
+      {
+        "id": "rail",
+        "title": "Rail",
+        "description": "Vertical means ↑ / ↓, not ← / →. Setting aria-orientation without rebinding the keys would lie to the screen reader, so both come from one prop.",
+        "group": "Variants",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"rail\"\n  orientation=\"vertical\"\n  aria-label=\"Settings\"\n  defaultValue=\"profile\"\n  items={[\n    { value: \"profile\", label: \"Profile\", icon: <UsersIcon />, children: <Profile /> },\n    { value: \"notifications\", label: \"Notifications\", icon: <BellIcon />, count: 4, children: <Notifications /> },\n    { value: \"security\", label: \"Security\", icon: <LockIcon />, children: <Security /> },\n    { value: \"members\", label: \"Members\", icon: <UsersIcon />, count: 32, children: <Members /> },\n    {\n      value: \"api\",\n      label: \"API keys\",\n      icon: <CogIcon />,\n      disabled: true,\n      disabledReason: \"Not enabled for this workspace\",\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "ghost",
+        "title": "Ghost",
+        "description": "No track, no rail, no indicator element — so no measurement pass and no ResizeObserver. For dense toolbars and popovers, where a second bordered box would compete with the one already there.",
+        "group": "Variants",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"ghost\"\n  aria-label=\"Preview mode\"\n  defaultValue=\"rendered\"\n  items={[\n    { value: \"rendered\", label: \"Rendered\", children: <Rendered /> },\n    { value: \"source\", label: \"Source\", children: <Source /> },\n    { value: \"diff\", label: \"Diff\", children: <Diff /> },\n  ]}\n/>"
+      },
+      {
+        "id": "command",
+        "title": "Command",
+        "description": "Two radiogroups, not one toolbar: layout and density are independent values, and merging them would lose the “checked, 1 of 4” that tells a screen-reader user the current view. Every icon carries a textLabel.",
+        "group": "Variants",
+        "code": "<div style={{ display: \"flex\", gap: 12 }}>\n  <Tabs\n    as=\"radiogroup\"\n    variant=\"command\"\n    aria-label=\"Layout\"\n    defaultValue=\"list\"\n    items={[\n      { value: \"list\", label: <ListIcon />, textLabel: \"List view\" },\n      { value: \"grid\", label: <GridIcon />, textLabel: \"Grid view\" },\n      { value: \"board\", label: <BoardIcon />, textLabel: \"Board view\" },\n      { value: \"calendar\", label: <CalendarIcon />, textLabel: \"Calendar view\" },\n    ]}\n  />\n  <Tabs\n    as=\"radiogroup\"\n    variant=\"command\"\n    size=\"sm\"\n    aria-label=\"Density\"\n    defaultValue=\"compact\"\n    items={[\n      { value: \"comfy\", label: \"Comfy\" },\n      { value: \"compact\", label: \"Compact\" },\n    ]}\n  />\n</div>"
+      },
+      {
+        "id": "stepper",
+        "title": "Stepper",
+        "description": "Backwards is free, forwards is earned. Completed steps stay reachable — locking them forces a restart to fix a typo. Review is locked, focusable, and says why.",
+        "group": "Variants",
+        "code": "<Tabs\n  as=\"steps\"\n  variant=\"stepper\"\n  aria-label=\"Patient intake\"\n  defaultValue=\"consent\"\n  items={[\n    { value: \"identity\", label: \"Identity\", state: \"done\", children: <Identity /> },\n    { value: \"insurance\", label: \"Insurance\", state: \"done\", children: <Insurance /> },\n    { value: \"consent\", label: \"Consent\", state: \"current\", children: <Consent /> },\n    {\n      value: \"review\",\n      label: \"Review\",\n      state: \"locked\",\n      disabled: true,\n      disabledReason: \"Complete the consent step first\",\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "card",
+        "title": "Card",
+        "description": "When choosing wrong has a consequence the label cannot carry, the option needs a sentence, and a sentence does not fit in a pill. Same accessibility tree as the filters, three times the surface.",
+        "group": "Variants",
+        "code": "<Tabs\n  as=\"radiogroup\"\n  variant=\"card\"\n  aria-label=\"How should this result be released?\"\n  defaultValue=\"immediate\"\n  items={[\n    {\n      value: \"immediate\",\n      textLabel: \"Immediate\",\n      label: <Option title=\"Immediate\" body=\"Visible in the patient portal as soon as it is verified.\" />,\n    },\n    {\n      value: \"reviewed\",\n      textLabel: \"After review\",\n      label: <Option title=\"After review\" body=\"Held until a clinician marks it reviewed. Median delay 6 h.\" />,\n    },\n    {\n      value: \"scheduled\",\n      textLabel: \"Scheduled\",\n      label: <Option title=\"Scheduled\" body=\"Released at a fixed time you choose, review or not.\" />,\n    },\n  ]}\n/>"
+      },
+      {
+        "id": "stat",
+        "title": "Stat",
+        "description": "Arrow and colour disagree on purpose: “No-show rate ▲” is bad and “Median wait ▼” is good, so direction alone cannot carry meaning. The accessible name says better or worse in words.",
+        "group": "Variants",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"stat\"\n  aria-label=\"Metric\"\n  defaultValue=\"appts\"\n  items={[\n    {\n      value: \"appts\",\n      textLabel: \"Appointments, 1,284, better than last week\",\n      label: <Stat name=\"Appointments\" value=\"1,284\" delta=\"▲ 6.2 % vs last week\" good />,\n      children: <Trend metric=\"appts\" />,\n    },\n    {\n      value: \"noshow\",\n      textLabel: \"No-show rate, 7.4 %, worse than last week\",\n      label: <Stat name=\"No-show rate\" value=\"7.4 %\" delta=\"▲ 1.1 pt vs last week\" />,\n      children: <Trend metric=\"noshow\" />,\n    },\n    {\n      value: \"wait\",\n      textLabel: \"Median wait, 12 m, better than last week\",\n      label: <Stat name=\"Median wait\" value=\"12 m\" delta=\"▼ 3 m vs last week\" good />,\n      children: <Trend metric=\"wait\" />,\n    },\n    {\n      value: \"portal\",\n      textLabel: \"Portal messages, 612, worse than last week\",\n      label: <Stat name=\"Portal messages\" value=\"612\" delta=\"▲ 18 % vs last week\" />,\n      children: <Trend metric=\"portal\" />,\n    },\n  ]}\n/>"
       },
       {
         "id": "segmented-filter",
         "title": "A segmented control is a form value",
         "description": "Not every tab strip is a view switch. A filter is a form control and belongs in a Form.Item, which is what `as=\"radiogroup\"` declares.",
+        "group": "Semantic modes",
         "code": "import { Form } from \"antd\";\n\n<Form.Item name=\"density\" label=\"Density\">\n  <Tabs\n    as=\"radiogroup\"\n    variant=\"segmented\"\n    items={[\n      { value: \"compact\", label: \"Compact\" },\n      { value: \"default\", label: \"Default\" },\n      { value: \"comfortable\", label: \"Comfortable\" },\n    ]}\n  />\n</Form.Item>;"
+      },
+      {
+        "id": "nav-links",
+        "title": "Navigation with real links",
+        "description": "as=\"nav\" renders a <nav> of real anchors: announced as “Overview, link, current page”, no arrow-key hijack, and cmd-click opens a new tab. Hover one and the browser shows the URL.",
+        "group": "Semantic modes",
+        "code": "<Tabs\n  as=\"nav\"\n  variant=\"underline\"\n  aria-label=\"Project\"\n  value={currentSection}\n  items={[\n    { value: \"overview\", label: \"Overview\", href: \"/project\" },\n    { value: \"issues\", label: \"Issues\", href: \"/project/issues\", count: 31 },\n    { value: \"pulls\", label: \"Pull requests\", href: \"/project/pulls\", count: 7 },\n    { value: \"actions\", label: \"Actions\", href: \"/project/actions\" },\n    { value: \"insights\", label: \"Insights\", href: \"/project/insights\" },\n  ]}\n/>"
+      },
+      {
+        "id": "overflow-scroll",
+        "title": "Scroll",
+        "description": "The default. Fade masks, nudge buttons and scroll-snap. The nudges are tabindex=-1: arrow keys already move selection and scroll follows, so two more tab stops would do nothing for a keyboard user.",
+        "group": "Overflow",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"underline\"\n  overflow=\"scroll\"\n  aria-label=\"Chart section\"\n  defaultValue=\"summary\"\n  items={chartSections}\n/>"
+      },
+      {
+        "id": "overflow-menu",
+        "title": "Priority-plus menu",
+        "description": "Widths are measured once and cached. Tabs that no longer fit move into a real role=menu, and the selected tab is pinned so it can never be the one that disappears. Resize the window to watch it.",
+        "group": "Overflow",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"underline\"\n  overflow=\"menu\"\n  aria-label=\"Chart section\"\n  defaultValue=\"summary\"\n  items={chartSections}\n/>"
+      },
+      {
+        "id": "overflow-collapse",
+        "title": "Collapse to a select",
+        "description": "Below a container width the strip becomes a native <select>, the one picker that already works on every phone. Driven by the container, not the viewport: tabs in a 380px drawer need it on a 1440px monitor too.",
+        "group": "Overflow",
+        "code": "<div style={{ maxWidth: 320 }}>\n  <Tabs\n    as=\"tabs\"\n    variant=\"underline\"\n    overflow=\"collapse\"\n    aria-label=\"Chart section\"\n    defaultValue=\"summary\"\n    items={chartSections}\n  />\n</div>"
+      },
+      {
+        "id": "unsaved-guard",
+        "title": "Unsaved-changes guard",
+        "description": "onBeforeChange may return a promise, because vetoing usually means asking a person. While it is pending the strip is inert and aria-busy. Cancel, and focus returns to where you were.",
+        "group": "States",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"segmented\"\n  aria-label=\"Note editor\"\n  defaultValue=\"compose\"\n  onBeforeChange={() => (isDirty ? confirmLeave() : true)}\n  items={[\n    { value: \"compose\", label: \"Compose\", dot: isDirty ? \"dirty\" : undefined, children: <Compose /> },\n    { value: \"preview\", label: \"Preview\", children: <Preview /> },\n    { value: \"history\", label: \"History\", children: <History /> },\n  ]}\n/>\n\n// Resolves when the clinician answers the dialog.\nfunction confirmLeave(): Promise<boolean> {\n  return openDialog({\n    title: \"This note has unsigned changes\",\n    confirm: \"Switch, keep draft\",\n    cancel: \"Stay and sign\",\n  });\n}"
+      },
+      {
+        "id": "restricted-stale",
+        "title": "Restricted and stale",
+        "description": "Hiding a restricted section teaches clinicians the record is complete when it is not. Vitals is stale rather than missing: a clinician reading cached observations needs to know they are cached.",
+        "group": "States",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"rail\"\n  orientation=\"vertical\"\n  aria-label=\"Sections\"\n  defaultValue=\"summary\"\n  items={[\n    { value: \"summary\", label: \"Summary\", icon: <DocIcon />, children: <Summary /> },\n    {\n      value: \"bh\",\n      label: \"Behavioural health\",\n      icon: <LockIcon />,\n      disabled: true,\n      disabledReason:\n        \"Restricted. Opening it records an access event against your account and notifies the record owner.\",\n    },\n    { value: \"meds\", label: \"Medications\", icon: <PillIcon />, children: <Meds /> },\n    { value: \"vitals\", label: \"Vitals\", icon: <HeartIcon />, availability: \"stale\", children: <Vitals /> },\n  ]}\n/>"
+      },
+      {
+        "id": "severity",
+        "title": "Severity in the strip",
+        "description": "A clinician scanning five tabs must see where the problem is without opening each. The red 2 carries a border and a hidden “2 critical”, and the panel repeats it as text. Tabs are never reordered by severity — position is memory.",
+        "group": "States",
+        "code": "<Tabs\n  as=\"tabs\"\n  variant=\"underline\"\n  aria-label=\"Chart sections\"\n  defaultValue=\"summary\"\n  items={[\n    { value: \"summary\", label: \"Summary\", icon: <DocIcon />, children: <Summary /> },\n    { value: \"vitals\", label: \"Vitals\", icon: <HeartIcon />, children: <Vitals /> },\n    {\n      value: \"labs\",\n      label: \"Labs\",\n      icon: <FlaskIcon />,\n      count: criticalResults.length,\n      tone: \"critical\",\n      children: <Labs />,\n    },\n    { value: \"meds\", label: \"Medications\", icon: <PillIcon />, count: 9, children: <Meds /> },\n    { value: \"notes\", label: \"Notes\", icon: <NoteIcon />, children: <Notes /> },\n  ]}\n/>"
+      },
+      {
+        "id": "every-variant",
+        "title": "Every variant, one tree",
+        "description": "The same items in all eleven skins. Tab into any of them and the keyboard model is identical, because the skin is CSS and the mode is the accessibility tree.",
+        "group": "States",
+        "code": "const VARIANTS = [\n  \"segmented\", \"underline\", \"pill\", \"enclosed\", \"rail\", \"ghost\",\n  \"stepper\", \"command\", \"card\", \"stat\", \"unstyled\",\n] as const;\n\nVARIANTS.map((variant) => (\n  <Tabs\n    key={variant}\n    as=\"tabs\"\n    variant={variant}\n    aria-label={variant + \" example\"}\n    defaultValue=\"a\"\n    items={[\n      { value: \"a\", label: \"Personal\" },\n      { value: \"b\", label: \"Shared\" },\n      { value: \"c\", label: \"Archived\" },\n    ]}\n  />\n));"
+      },
+      {
+        "id": "theme-density",
+        "title": "Nine combinations at once",
+        "description": "Light, dark and high contrast against patient, standard and clinical density. The theme and density are attributes on any ancestor; nothing in the component changes. All nine side by side is how a token bug gets caught.",
+        "group": "Theme and density",
+        "code": "{[\"light\", \"dark\", \"high-contrast\"].map((theme) =>\n  [\"patient\", \"standard\", \"clinical\"].map((density) => (\n    <div key={theme + density} data-zb-theme={theme} data-zb-density={density}>\n      <Tabs\n        as=\"radiogroup\"\n        variant=\"segmented\"\n        aria-label=\"Scope\"\n        defaultValue=\"personal\"\n        items={[\n          { value: \"personal\", label: \"Personal\" },\n          { value: \"shared\", label: \"Shared\" },\n        ]}\n      />\n      <Tabs\n        as=\"tabs\"\n        variant=\"underline\"\n        aria-label=\"Results\"\n        defaultValue=\"labs\"\n        items={[\n          { value: \"labs\", label: \"Labs\", count: 2, tone: \"critical\" },\n          { value: \"meds\", label: \"Meds\", count: 9 },\n        ]}\n      />\n    </div>\n  )),\n)}"
       }
     ],
     "fixtures": [
