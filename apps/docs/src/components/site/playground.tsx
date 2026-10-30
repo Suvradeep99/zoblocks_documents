@@ -19,19 +19,113 @@
 
 import * as React from "react";
 import type { Control } from "@zoblocks/component-meta";
-import { allergyList, medicationList, observationPanel } from "@zoblocks/fixtures";
+import {
+  allergyList,
+  medicationList,
+  observationCorrected,
+  observationDeclined,
+  observationMasked,
+  observationPanel,
+  observationPotassiumCritical,
+  observationPreliminary,
+} from "@zoblocks/fixtures";
 import { Tabs, type TabsItemProps, type TabsProps } from "@zoblocks/tabs";
 import { ConfigProvider, Form, theme } from "antd";
 import { Signature, signatureRequired, type SignatureProps } from "@zoblocks/signature";
 import { PLAYGROUND_COMPONENTS } from "./playground-registry";
+import { PulseLoader } from "@/registry/zoblocks/pulse-loader/pulse-loader";
+import { RhythmLoader } from "@/registry/zoblocks/rhythm-loader/rhythm-loader";
+import { BreathLoader } from "@/registry/zoblocks/breath-loader/breath-loader";
+import { HelixLoader } from "@/registry/zoblocks/helix-loader/helix-loader";
+import { InfusionLoader } from "@/registry/zoblocks/infusion-loader/infusion-loader";
+import {
+  TrendIndicator,
+  type TrendSeries,
+} from "@/registry/zoblocks/trend-indicator/trend-indicator";
+import {
+  PresenceChip,
+  type Presence,
+} from "@/registry/zoblocks/care-team-presence/care-team-presence";
+import {
+  ChartHeader,
+  type EncounterOption,
+  type SafetyInput,
+} from "@/registry/zoblocks/chart-header/chart-header";
+import type { Patient } from "@zoblocks/fhir";
+import {
+  ProvenanceChip,
+  type ProvenanceRecord,
+  type StalenessPolicy,
+} from "@/registry/zoblocks/provenance-chip/provenance-chip";
+import {
+  RecentPatientStack,
+  type OpenChart,
+} from "@/registry/zoblocks/recent-patient-stack/recent-patient-stack";
+import { ResultValue, fromObservation } from "@/registry/zoblocks/result-value/result-value";
+import {
+  RiskIndicator,
+  type RiskAssessment,
+} from "@/registry/zoblocks/risk-indicator/risk-indicator";
+import {
+  ChartAccordion,
+  type ChartSection,
+} from "@/registry/zoblocks/chart-accordion/chart-accordion";
+import { SignGate, type NoteAuthor } from "@/registry/zoblocks/clinical-note/clinical-note";
+import type { Finding } from "@zoblocks/clinical-note-core";
+import { SafetyPlan, type SafetyPlanSteps } from "@/registry/zoblocks/safety-plan/safety-plan";
+import { Timeline, type TimelineItemType } from "@/registry/zoblocks/timeline/timeline";
+import { Copilot, type CopilotProps } from "@/registry/zoblocks/copilot/copilot";
+import {
+  createStaticProvider,
+  lookUp,
+  minimalDisclosure,
+  type CopilotEvent,
+  type Source,
+} from "@zoblocks/copilot-core";
+import { Switch, type SwitchProps } from "@/registry/zoblocks/switch/switch";
+import { Accordion } from "@/registry/zoblocks/accordion/accordion";
+import { CHART_ITEMS } from "./accordion-demos";
+import { ClinicalStatus } from "@/registry/zoblocks/clinical-status/clinical-status";
+import { SCALES, type ScaleName } from "@/lib/zoblocks-clinical-status";
+import { BUPRENORPHINE, MenuRow, PLAYGROUND_ACTIONS } from "./chart-context-menu-demos";
+import { DatePickerPlayground, datePickerPlaygroundAttrs } from "./date-picker-demos";
+import { DataGridPlayground } from "./data-grid-demos";
+import { CareTimelinePlayground } from "./care-timeline-demos";
+import { RecorderPlayground, recorderPlaygroundAttrs } from "./recorder-demos";
+import type { DatePickerVariant } from "@/registry/zoblocks/date-picker/date-picker";
 import { useSiteTheme } from "./use-site-theme";
 import { useAntdBrandTokens } from "./language-antd-theme";
+import { jsxAttr, jsxElement } from "@/lib/highlight";
+import { CodeLines, CopyButton, PlatformLinks } from "./docs/code-block";
+import type { DemoLink } from "./docs/sandbox";
 
 type Props = Record<string, unknown>;
 
 /* ------------------------------------------------------------------ */
 /* Renderers                                                           */
 /* ------------------------------------------------------------------ */
+
+function PlaygroundSwitch(props: Partial<SwitchProps>) {
+  const [checked, setChecked] = React.useState<SwitchProps["checked"]>(true);
+  return (
+    <Centered>
+      <Switch
+        key={`${props.appearance ?? ""}-${props.commit ?? ""}`}
+        {...props}
+        checked={checked}
+        onCommit={async (next) => {
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          setChecked(next);
+        }}
+      />
+    </Centered>
+  );
+}
+
+/** A loader is a mark, not a layout: it sits in the middle of the stage. */
+function Centered({ children }: { children: React.ReactNode }) {
+  return <div className="flex justify-center">{children}</div>;
+}
 
 function Filler({ children }: { children: React.ReactNode }) {
   return <p className="px-1 py-4 text-sm text-graphite">{children} panel.</p>;
@@ -106,7 +200,373 @@ function chartFor(mode: string, fixture: string): TabsItemProps[] {
   }));
 }
 
+/**
+ * A falling PHQ-9 — five comparable points, so the knobs always have a real
+ * trend to draw. `width`/`height` are the knobs; `series` is fixed, because
+ * picking a series is the same editorial call `accordion`'s fixed items are.
+ */
+const PHQ9_TREND: TrendSeries = {
+  id: "phq9",
+  label: "PHQ-9",
+  valence: "higher-is-worse",
+  significantChange: 5,
+  referenceRange: { low: 0, high: 4 },
+  points: [
+    { at: "2026-03-04T09:00:00Z", value: 21 },
+    { at: "2026-04-04T09:00:00Z", value: 18 },
+    { at: "2026-05-04T09:00:00Z", value: 14 },
+    { at: "2026-06-04T09:00:00Z", value: 11 },
+    { at: "2026-07-04T09:00:00Z", value: 9 },
+  ],
+};
+
+/**
+ * Signed out, with the cover named — the state the component exists to get
+ * right: online, at a desk, and the wrong person to contact.
+ */
+const CTP_PRESENCE: Presence = {
+  clinician: { id: "clin-4", display: "A. Vance, MD", role: "Attending" },
+  state: "signed-out",
+  coveredBy: { id: "clin-1", display: "T. Boateng, MD", role: "Night attending" },
+  until: "07:00",
+};
+
+const CH_PATIENT: Patient = {
+  resourceType: "Patient",
+  id: "syn-ch-1",
+  name: [{ use: "official", family: "Okonkwo", given: ["Amara"] }],
+  birthDate: "1985-03-08",
+  gender: "female",
+  identifier: [
+    { use: "official", system: "http://example.org/fhir/sid/mrn", value: "093-441-208" },
+    { use: "official", system: "https://fhir.nhs.uk/Id/nhs-number", value: "943 476 5919" },
+  ],
+};
+
+const CH_IDENTIFIERS = [{ kind: "mrn" }, { kind: "nhs" }] as const;
+
+const CH_ENCOUNTERS: EncounterOption[] = [
+  { id: "enc-1", label: "Inpatient — Ward 4B", type: "inpatient" },
+  { id: "enc-2", label: "Outpatient — 24 Aug, 09:00", type: "ambulatory" },
+  { id: "enc-3", label: "Telehealth — 24 Aug, 14:00", type: "virtual" },
+];
+
+const CH_SAFETY: SafetyInput = {
+  allergies: { label: "Penicillin — anaphylaxis", tone: "critical", detail: "confirmed" },
+  codeStatus: { label: "DNR" },
+  isolation: { label: "Contact precautions", detail: "MRSA" },
+  legalStatus: { label: "Involuntary hold", until: "2026-08-24T09:00:00Z" },
+};
+
+/** A clinic reading, performed and witnessed — the ordinary, actionable case. */
+const PC_RECORD: ProvenanceRecord = {
+  source: "clinic",
+  observedAt: "2026-08-12T09:48:00Z",
+  performer: { display: "M. Adeyemi", role: "MA" },
+  device: "Welch Allyn 6000",
+};
+
+/** Two days for a device reading, a month for self-report, silence otherwise. */
+const PC_POLICY: StalenessPolicy = (record) => {
+  if (record.source === "device") return 48 * 3_600_000;
+  if (record.source === "patient-reported") return 30 * 86_400_000;
+  return null;
+};
+
+/** Three open charts: one pinned, one with outstanding work, none photographed. */
+const RPS_CHARTS: OpenChart[] = [
+  {
+    id: "chart-okonkwo",
+    display: "A. Okonkwo",
+    identifier: "093-441-208",
+    reason: "Ward round",
+    lastActiveAt: "2026-08-24T09:58:00Z",
+  },
+  {
+    id: "chart-boateng",
+    display: "T. Boateng",
+    identifier: "093-118-774",
+    reason: "Discharge summary",
+    lastActiveAt: "2026-08-24T09:30:00Z",
+    work: [{ kind: "unsigned-note", label: "Progress note", since: "2026-08-21T09:00:00Z" }],
+  },
+  {
+    id: "chart-vance",
+    display: "R. Vance",
+    identifier: "093-004-661",
+    reason: "Med review",
+    pinned: true,
+    lastActiveAt: "2026-08-23T17:00:00Z",
+  },
+];
+
+/**
+ * The `value` knob names a fixture rather than carrying one — same reason
+ * Tabs' `items` knob does — so the renderer resolves the name through
+ * `fromObservation` rather than passing it through.
+ */
+const RESULT_OBSERVATIONS = {
+  observationPotassiumCritical,
+  observationPreliminary,
+  observationCorrected,
+  observationMasked,
+  observationDeclined,
+} as const;
+
+/** A 30-day readmission score, with six drivers so `driverCount` has a real ceiling to reach. */
+const RI_ASSESSMENT: RiskAssessment = {
+  id: "ri1",
+  outcome: "30-day readmission",
+  band: "high",
+  probability: 0.31,
+  percentile: 94,
+  cohort: "adult medicine",
+  computedAt: "2026-08-12T04:12:00Z",
+  validUntil: "2026-08-13T04:12:00Z",
+  drivers: [
+    { label: "3 admissions / 6 mo", weight: 11.2 },
+    { label: "Lives alone", weight: 4.8 },
+    { label: "No PCP visit < 90 d", weight: 3.9 },
+    { label: "Polypharmacy, 9 meds", weight: 2.6 },
+    { label: "ED visit, 14 d", weight: 2.1 },
+    { label: "Adherent to statin", weight: -2.1 },
+  ],
+  model: { name: "Readmit-v4", auc: 0.71 },
+};
+
+const RI_FRAMING =
+  "A statistical estimate from historical patterns. Not a diagnosis, and not a substitute for assessment.";
+
+/** Four sections, two severities and a withheld one, so the toolbar has real work to do. */
+const CA_SECTIONS: ChartSection[] = [
+  {
+    key: "risk",
+    label: "Risk & suicidality",
+    severity: "critical",
+    status: "C-SSRS positive",
+    updatedAt: "2026-08-13",
+    children: <p>Ideation 3 — active thoughts, no plan, no intent, no preparatory behaviour.</p>,
+  },
+  {
+    key: "meds",
+    label: "Medications",
+    severity: "high",
+    status: "Clozapine ANC due 18 Aug",
+    count: "4 active",
+    children: <p>Clozapine 200 mg nocte. ANC due 18 Aug.</p>,
+  },
+  {
+    key: "notes",
+    label: "Progress notes",
+    count: "142 encounters",
+    updatedAt: "2026-08-13",
+    children: <p>BIRP format.</p>,
+  },
+  {
+    key: "psychotherapy",
+    label: "Psychotherapy notes",
+    access: { kind: "withheld", reason: "Kept separately by the author" },
+  },
+];
+
+const CN_AUTHOR: NoteAuthor = { display: "R. Menon, MD", role: "Resident", requiresCosign: true };
+
+/** One block, one warning, one pass — so the gate has real work to summarise either way. */
+const CN_FINDINGS: Finding[] = [
+  {
+    id: "unreviewed-ai",
+    severity: "block",
+    title: "A model-drafted passage has not been reviewed",
+    detail: "History of present illness, second sentence.",
+  },
+  {
+    id: "copy-forward",
+    severity: "warn",
+    title: "32% of this note is copied forward",
+    detail: "From the admission note, 14 Aug.",
+  },
+  { id: "required-sections", severity: "pass", title: "Every required section has content" },
+];
+
+/** The Stanley-Brown six, complete. */
+const SP_STEPS: SafetyPlanSteps = {
+  warningSigns: {
+    entries: ["Sleeping less than four hours", "Not answering messages for two days"],
+  },
+  internalCoping: {
+    entries: ["Walk to the end of the road and back", "Four in, six out, ten times"],
+  },
+  distractions: { entries: ["The cafe on Bell Street before 11am"] },
+  supportContacts: {
+    contacts: [{ name: "Priya", detail: "Sister", availability: "Any time" }],
+  },
+  professionals: {
+    contacts: [
+      { name: "988", detail: "Suicide & Crisis Lifeline", availability: "24 hours" },
+      { name: "County crisis team", detail: "555 0148", availability: "24 hours" },
+    ],
+  },
+  environment: { entries: ["Priya is holding the spare keys to the garage"] },
+};
+
+/** Four admission events, in order. */
+const TL_ITEMS: TimelineItemType[] = [
+  { title: "14 Aug, 08:12", content: "Admitted — ward round" },
+  { title: "14 Aug, 14:30", content: "Hemoglobin 7.1 g/dL, down from 11.8 g/dL" },
+  { title: "15 Aug, 09:00", content: "First unit transfused" },
+  { title: "16 Aug, 14:02", content: "Progress note filed" },
+];
+
+const COPILOT_DISCLOSURE = minimalDisclosure("demo-model@1", {
+  developer: "Zowork",
+  knowledgeCutoff: "2025-10",
+});
+
+const COPILOT_GUIDELINE: Source = {
+  id: "acc-aha-af",
+  title: "2023 ACC/AHA/HRS AF Guideline",
+  passage:
+    "In patients with atrial fibrillation and rapid ventricular response, rate control is a reasonable initial approach for those without severe symptoms.",
+  highlight: [40, 106],
+  kind: "guideline",
+  version: "2023.1",
+  retrievedAt: "2026-08-16T09:00:00.000Z",
+  score: 0.91,
+};
+
+/** A cited, grounded answer — the state the component exists to make routine. */
+const COPILOT_STREAM: CopilotEvent[] = [
+  {
+    type: "delta",
+    text: "Rate control is a reasonable initial approach for most patients without severe symptoms.",
+  },
+  { type: "citation", marker: 1, source: COPILOT_GUIDELINE },
+  { type: "claim", claim: { span: [0, 88], markers: [1] } },
+  { type: "done", finish: "stop" },
+];
+
+/**
+ * `anchor` stays fixed to `inline` here, the same way every Preview scenario
+ * for this component already does: the other two values dock the component
+ * `fixed` to the real viewport edge, which would make it escape the
+ * playground's own stage rather than stay inside it. `suppressed` stays
+ * fixed to `false` for the reason Chart Command Palette's `open` was never a
+ * knob — a prop whose true value means "render nothing" always fails the
+ * walk's survives check for that exact setting, not as a matter of odds.
+ */
+function CopilotPlaygroundDemo(props: Partial<CopilotProps>) {
+  const provider = React.useMemo(
+    () =>
+      createStaticProvider({ events: COPILOT_STREAM, disclosure: COPILOT_DISCLOSURE, delayMs: 90 }),
+    [],
+  );
+  return (
+    <Copilot
+      provider={provider}
+      modes={[lookUp]}
+      actor={{ display: "Dr Amara Okafor", credential: "MD", reference: "Practitioner/7" }}
+      {...props}
+      anchor="inline"
+      suppressed={false}
+    />
+  );
+}
+
 const RENDERERS: Record<string, (props: Props) => React.ReactNode> = {
+  /*
+   * The worklist with every interaction live — sort, selection, held
+   * arrivals — so each event knob has something to fire on, and wide columns
+   * so pinning has something to scroll past.
+   */
+  "data-grid": (props) => <DataGridPlayground {...props} />,
+  /*
+   * The whole chart, with a failed source, a review marker and a cluster, so
+   * every knob has something to act on. Scrolls in its own region.
+   */
+  "care-timeline": (props) => <CareTimelinePlayground {...props} />,
+  /*
+   * Each art with the input it reads — the demo microphone, a finished take,
+   * or a transcript — so switching art never lands on an empty pane.
+   */
+  recorder: (props) => <RecorderPlayground {...props} />,
+  /*
+   * One knob, sixteen surfaces. Each variant gets the fixtures its examples
+   * use, because most of the family is data-shaped — a slot grid with no set
+   * is an empty box, and that is not what a reader came to see.
+   */
+  "date-picker": (props) => (
+    <DatePickerPlayground variant={props.variant as DatePickerVariant | undefined} />
+  ),
+  /*
+   * One order carrying the whole ladder — routine, recorded, clinical,
+   * disclosive and a withheld verb — so every knob and all three events have
+   * something to act on. The reader summons it; nothing opens on its own.
+   */
+  "chart-context-menu": (props) => (
+    <div className="mx-auto grid w-full max-w-md gap-2">
+      <MenuRow
+        subject={BUPRENORPHINE}
+        actions={PLAYGROUND_ACTIONS}
+        policy={{ role: "a registered nurse", breakGlass: true }}
+        aside="08:00"
+        {...props}
+      />
+      <p className="m-0 text-center text-xs text-graphite">
+        Right-click the row, or focus it and press Shift+F10.
+      </p>
+    </div>
+  ),
+  "clinical-status": (props) => (
+    <Centered>
+      <ClinicalStatus
+        {...(props as { scale: ScaleName; step: string })}
+        scale={(props.scale as ScaleName | undefined) ?? "criticality"}
+        step={String(props.step ?? "critical")}
+      />
+    </Centered>
+  ),
+  accordion: (props) => (
+    <div className="mx-auto w-full max-w-xl">
+      <Accordion items={CHART_ITEMS} defaultActiveKey={["risk"]} {...props} />
+    </div>
+  ),
+  /*
+   * Switch writes through onCommit, so the playground shows the whole
+   * request: pending for a moment, then committed. `key` remounts it when the
+   * appearance or commit mode changes, because those choose a different
+   * control rather than restyling the same one.
+   */
+  switch: (props) => <PlaygroundSwitch {...(props as Partial<SwitchProps>)} />,
+  /*
+   * The loaders take their knobs as they are. `mode` is not one of them:
+   * `page` covers the viewport, which in a playground covers the page the
+   * reader is using to turn it off. Overlay is shown as an example instead.
+   */
+  "pulse-loader": (props) => (
+    <Centered>
+      <PulseLoader {...props} />
+    </Centered>
+  ),
+  "rhythm-loader": (props) => (
+    <Centered>
+      <RhythmLoader {...props} />
+    </Centered>
+  ),
+  "breath-loader": (props) => (
+    <Centered>
+      <BreathLoader {...props} />
+    </Centered>
+  ),
+  "helix-loader": (props) => (
+    <Centered>
+      <HelixLoader {...props} />
+    </Centered>
+  ),
+  "infusion-loader": (props) => (
+    <Centered>
+      <InfusionLoader {...props} />
+    </Centered>
+  ),
   tabs: (props) => {
     const { items, ...rest } = props as { items?: string } & Partial<TabsProps>;
     const mode = rest.as ?? "tabs";
@@ -159,6 +619,268 @@ const RENDERERS: Record<string, (props: Props) => React.ReactNode> = {
       </Form>
     );
   },
+  "trend-indicator": (props) => (
+    <Centered>
+      <TrendIndicator series={PHQ9_TREND} {...props} />
+    </Centered>
+  ),
+  "care-team-presence": (props) => (
+    <Centered>
+      <PresenceChip presence={CTP_PRESENCE} now="2026-08-24T02:30:00+05:30" {...props} />
+    </Centered>
+  ),
+  /*
+   * `collapsed` only sets the header's starting height — the component owns
+   * the state from then on, same as Accordion's `defaultOpenKeys` — so the
+   * knob needs a remount to be seen, the same `key` trick Switch uses.
+   */
+  "chart-header": (props) => (
+    <ChartHeader
+      key={`${String(props.collapsed ?? false)}-${String(props.surface ?? "overview")}`}
+      patient={CH_PATIENT}
+      identifiers={CH_IDENTIFIERS}
+      now="2026-08-24T10:00:00Z"
+      safety={CH_SAFETY}
+      encounters={CH_ENCOUNTERS}
+      {...props}
+    />
+  ),
+  /*
+   * `now` is a text knob and `Knob` clears it to an explicit `undefined`
+   * rather than omitting the key, which would win over a fixed default
+   * placed before the spread — so it is resolved after, same shape as the
+   * `key` trick above for a prop the spread can't be allowed to blank out.
+   */
+  "provenance-chip": (props) => (
+    <Centered>
+      <ProvenanceChip
+        record={PC_RECORD}
+        stalenessPolicy={PC_POLICY}
+        {...props}
+        now={typeof props.now === "string" && props.now ? props.now : "2026-08-12T10:00:00Z"}
+      />
+    </Centered>
+  ),
+  /*
+   * `expanded` only sets the stack's starting layout — the component owns it
+   * from then on — so the knob remounts it, the same trick Chart Header's
+   * `collapsed` uses.
+   */
+  "recent-patient-stack": (props) => (
+    <RecentPatientStack
+      key={String(props.expanded ?? false)}
+      charts={RPS_CHARTS}
+      activeId="chart-okonkwo"
+      now="2026-08-24T10:00:00Z"
+      {...props}
+    />
+  ),
+  "result-value": (props) => {
+    const { value, now, ...rest } = props as { value?: string; now?: string } & Record<
+      string,
+      unknown
+    >;
+    const observation =
+      RESULT_OBSERVATIONS[value as keyof typeof RESULT_OBSERVATIONS] ??
+      observationPotassiumCritical;
+    return (
+      <Centered>
+        <ResultValue
+          {...rest}
+          value={fromObservation(observation)}
+          now={now ? now : "2026-08-12T10:00:00Z"}
+        />
+      </Centered>
+    );
+  },
+  /*
+   * `now` and `notADiagnosis` are both required props and both text knobs,
+   * so both carry the same clear-to-undefined ordering issue Provenance
+   * Chip's `now` does — resolved the same way, after the spread.
+   */
+  "risk-indicator": (props) => {
+    const { now, notADiagnosis, ...rest } = props as {
+      now?: string;
+      notADiagnosis?: string;
+    } & Record<string, unknown>;
+    return (
+      <Centered>
+        <RiskIndicator
+          assessment={RI_ASSESSMENT}
+          {...rest}
+          now={now ? now : "2026-08-12T10:00:00Z"}
+          notADiagnosis={notADiagnosis ? notADiagnosis : RI_FRAMING}
+        />
+      </Centered>
+    );
+  },
+  "chart-accordion": (props) => (
+    <div className="mx-auto w-full max-w-xl">
+      <ChartAccordion
+        sections={CA_SECTIONS}
+        toolbarLabel="Okonkwo, A. · MRN 4471902"
+        defaultOpenKeys={["risk"]}
+        {...props}
+      />
+    </div>
+  ),
+  /*
+   * SignGate, not the full editor — it is the export `controls` validates
+   * against (the catalogue's "front door" for this component), and the
+   * knob worth having here is the one the gate itself names: whether
+   * policy even permits this author to sign, kept separate from whether
+   * the findings currently allow it.
+   */
+  "clinical-note": (props) => (
+    <div className="mx-auto w-full max-w-md">
+      <SignGate
+        findings={CN_FINDINGS}
+        author={CN_AUTHOR}
+        canSign
+        attestation="I have reviewed this note in its entirety and attest that it accurately reflects the care I provided."
+        {...props}
+      />
+    </div>
+  ),
+  "safety-plan": (props) => (
+    <div className="mx-auto w-full max-w-xl">
+      <SafetyPlan steps={SP_STEPS} revisedAt="2026-08-11" headingLevel={3} {...props} />
+    </div>
+  ),
+  timeline: (props) => (
+    <div className="mx-auto w-full max-w-xl">
+      <Timeline items={TL_ITEMS} aria-label="Admission chronology" {...props} />
+    </div>
+  ),
+  copilot: (props) => (
+    <div className="mx-auto w-full max-w-md">
+      <CopilotPlaygroundDemo {...(props as Partial<CopilotProps>)} />
+    </div>
+  ),
+};
+
+/**
+ * Array props behind single-choice knobs, per component. The renderer wraps
+ * the knob's string (see `signature` above); the generated code has to say the
+ * same thing, or a reader copies `methods="draw"` into a prop that maps.
+ */
+/**
+ * Knobs whose options depend on another knob.
+ *
+ * A Clinical Status step only exists within its scale — "critical" is a
+ * criticality step and means nothing on the access scale — so the step knob
+ * lists the chosen scale's steps rather than taking free text the component
+ * would refuse.
+ */
+const DYNAMIC_OPTIONS: Record<string, Record<string, (props: Props) => string[]>> = {
+  "clinical-status": {
+    step: (props) =>
+      (SCALES[(props.scale as ScaleName | undefined) ?? "criticality"]?.steps ?? []).map(
+        (step) => step.id,
+      ),
+  },
+};
+
+/**
+ * Brings a props object back to one the component accepts, after any knob
+ * changes. Changing the scale keeps the step when it exists there and falls
+ * back to the scale's first step when it does not.
+ */
+function normalise(name: string, props: Props): Props {
+  const dynamic = DYNAMIC_OPTIONS[name];
+  if (!dynamic) return props;
+  const next = { ...props };
+  for (const [prop, optionsFor] of Object.entries(dynamic)) {
+    const options = optionsFor(next);
+    if (options.length && !options.includes(String(next[prop]))) next[prop] = options[0];
+  }
+  return next;
+}
+
+/**
+ * Props the renderer supplies that no knob controls, written into the code so
+ * the snippet a reader copies is one that renders — an Accordion with no
+ * items is a valid call that draws nothing.
+ */
+const FIXED_ATTRS: Record<string, readonly string[] | ((props: Props) => readonly string[])> = {
+  // Per variant: what a slot grid needs is not what a birth date needs.
+  "date-picker": datePickerPlaygroundAttrs,
+  // Per art: duet reads a take, stream a transcript, the rest a microphone.
+  recorder: recorderPlaygroundAttrs,
+  "care-timeline": [
+    'aria-label="Care timeline for Ada Lovelace"',
+    "events={events}",
+    "now={serverTime}",
+    "coverage={coverage}",
+  ],
+  "data-grid": [
+    'caption="Clients on this team\'s caseload"',
+    "columns={columns}",
+    "rows={rows}",
+    "rowKey={(row) => row.mrn}",
+    "coverage={coverage}",
+  ],
+  accordion: ["items={chartSections}", 'defaultActiveKey={["risk"]}'],
+  "chart-context-menu": [
+    "subject={order}",
+    "actions={orderActions}",
+    'policy={{ role: "a registered nurse", breakGlass: true }}',
+    "now={serverTime}",
+  ],
+  "trend-indicator": ["series={phq9}"],
+  "care-team-presence": ["presence={vance}", 'now="2026-08-24T02:30:00+05:30"'],
+  "chart-header": [
+    "patient={patient}",
+    'identifiers={[{ kind: "mrn" }, { kind: "nhs" }]}',
+    'now="2026-08-24T10:00:00Z"',
+    "safety={safety}",
+    "encounters={encounters}",
+  ],
+  "provenance-chip": ["record={record}", "stalenessPolicy={stalenessPolicy}"],
+  "recent-patient-stack": [
+    "charts={charts}",
+    'activeId="chart-okonkwo"',
+    'now="2026-08-24T10:00:00Z"',
+  ],
+  "risk-indicator": ["assessment={assessment}"],
+  "chart-accordion": [
+    "sections={chartSections}",
+    'toolbarLabel="Okonkwo, A. · MRN 4471902"',
+    'defaultOpenKeys={["risk"]}',
+  ],
+  "clinical-note": [
+    "findings={findings}",
+    'author={{ display: "R. Menon, MD", role: "Resident", requiresCosign: true }}',
+    'attestation="I have reviewed this note in its entirety and attest that it accurately reflects the care I provided."',
+  ],
+  "safety-plan": ["steps={steps}", 'revisedAt="2026-08-11"', "headingLevel={3}"],
+  timeline: ["items={items}", 'aria-label="Admission chronology"'],
+  copilot: [
+    "provider={provider}",
+    "modes={[lookUp]}",
+    'actor={{ display: "Dr Amara Okafor", credential: "MD", reference: "Practitioner/7" }}',
+    'anchor="inline"',
+  ],
+};
+
+function resolveFixed(
+  fixed: readonly string[] | ((props: Props) => readonly string[]) | undefined,
+  props: Props,
+): readonly string[] | undefined {
+  return typeof fixed === "function" ? fixed(props) : fixed;
+}
+
+/**
+ * Children the renderer supplies, written into the code for the same reason:
+ * ChartContextMenu takes its trigger as a render function, and a call without
+ * one does not type-check.
+ */
+const FIXED_CHILDREN: Record<string, string> = {
+  "chart-context-menu": "{(trigger) => <tr {...trigger}>{cells}</tr>}",
+};
+
+const ARRAY_PROPS: Record<string, readonly string[]> = {
+  signature: ["methods", "outcomes"],
 };
 
 /* ------------------------------------------------------------------ */
@@ -219,9 +941,18 @@ class PlaygroundBoundary extends React.Component<
 /* Widgets                                                             */
 /* ------------------------------------------------------------------ */
 
+const LABEL = "font-mono text-xs text-ink";
+
 const FIELD =
-  "min-h-6 w-full rounded-lg border border-rule bg-paper px-2 py-1 text-sm text-ink " +
+  "h-8 w-full rounded-lg border border-rule bg-paper px-2 font-mono text-[11.5px] text-ink " +
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
+
+/**
+ * A segmented row in the 240px panel holds about 26 characters of mono labels.
+ * Past that the labels truncate to "radi…", which names nothing, so the knob
+ * falls back to a select.
+ */
+const SEGMENT_CHARS = 26;
 
 function Knob({
   control,
@@ -234,44 +965,57 @@ function Knob({
 }) {
   const id = `knob-${control.prop}`;
   const label = control.label ?? control.prop;
+  const options = control.options ?? [];
 
   if (control.control === "switch") {
+    const on = Boolean(value);
     return (
-      <label className="flex min-h-6 items-center gap-2 text-sm text-graphite" htmlFor={id}>
-        <input
-          id={id}
-          type="checkbox"
-          className="size-4 accent-[var(--color-brand)]"
-          checked={Boolean(value)}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        {label}
-      </label>
+      <button
+        type="button"
+        role="switch"
+        id={id}
+        aria-checked={on}
+        onClick={() => onChange(!on)}
+        className="flex w-full items-center justify-between gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      >
+        <span className={LABEL}>{label}</span>
+        <span
+          aria-hidden="true"
+          className={`relative h-4 w-7 flex-none rounded-full transition-colors ${on ? "bg-brand" : "bg-rule-strong"}`}
+        >
+          <span
+            className={`absolute top-0.5 size-3 rounded-full bg-white transition-[left] ${on ? "left-3.5" : "left-0.5"}`}
+          />
+        </span>
+      </button>
     );
   }
 
-  if (control.control === "segmented") {
+  const fits = options.join("").length + options.length * 2 <= SEGMENT_CHARS;
+  const segmented =
+    options.length > 0 && fits && ["segmented", "select", "fixture"].includes(control.control);
+
+  if (segmented) {
     return (
-      <fieldset className="min-w-0">
-        <legend className="numeric text-[0.625rem] uppercase tracking-wide text-graphite-soft">
-          {label}
-        </legend>
-        {/* Radios rather than buttons: this is a single choice from a fixed
-            set, which is what a radiogroup already announces correctly. */}
-        <div className="mt-1 flex flex-wrap gap-1">
-          {(control.options ?? []).map((option) => (
+      <fieldset className="m-0 flex min-w-0 flex-col gap-[7px] border-0 p-0">
+        <legend className={`${LABEL} mb-[7px] p-0`}>{label}</legend>
+        {/* Native radios, visually hidden: a single choice from a fixed set is
+            what a radio group already announces and drives by arrow key. */}
+        <div className="flex rounded-lg border border-rule bg-paper-sunk p-0.5">
+          {options.map((option) => (
             <label
               key={option}
-              className="flex min-h-6 cursor-pointer items-center gap-1.5 rounded-lg border border-rule px-2 py-0.5 text-xs text-graphite has-[:checked]:border-brand/50 has-[:checked]:text-ink"
+              title={option}
+              className="flex h-[26px] min-w-0 flex-1 cursor-pointer items-center justify-center truncate rounded-md px-1.5 font-mono text-[11.5px] text-graphite transition-colors has-[:checked]:bg-paper has-[:checked]:text-ink has-[:checked]:shadow-[0_0_0_1px_var(--color-rule),0_1px_2px_rgb(0_0_0/0.06)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-brand"
             >
               <input
                 type="radio"
                 name={id}
-                className="size-3 accent-[var(--color-brand)]"
+                className="sr-only"
                 checked={value === option}
                 onChange={() => onChange(option)}
               />
-              {option}
+              <span className="truncate">{option}</span>
             </label>
           ))}
         </div>
@@ -279,23 +1023,20 @@ function Knob({
     );
   }
 
-  if (control.control === "select" || control.control === "fixture") {
+  if (["segmented", "select", "fixture"].includes(control.control)) {
     return (
-      <div className="min-w-0">
-        <label
-          htmlFor={id}
-          className="numeric block text-[0.625rem] uppercase tracking-wide text-graphite-soft"
-        >
+      <div className="flex min-w-0 flex-col gap-[7px]">
+        <label htmlFor={id} className={LABEL}>
           {label}
         </label>
         <select
           id={id}
-          className={`mt-1 ${FIELD}`}
+          className={FIELD}
           value={String(value ?? "")}
           onChange={(event) => onChange(event.target.value || undefined)}
         >
           <option value="">— unset —</option>
-          {(control.options ?? []).map((option) => (
+          {options.map((option) => (
             <option key={option} value={option}>
               {option}
             </option>
@@ -307,17 +1048,15 @@ function Knob({
 
   if (control.control === "slider") {
     return (
-      <div className="min-w-0">
-        <label
-          htmlFor={id}
-          className="numeric block text-[0.625rem] uppercase tracking-wide text-graphite-soft"
-        >
-          {label} <span className="text-ink">{String(value ?? control.min ?? 0)}</span>
+      <div className="flex min-w-0 flex-col gap-[7px]">
+        <label htmlFor={id} className={`${LABEL} flex justify-between`}>
+          <span>{label}</span>
+          <span className="text-graphite">{String(value ?? control.min ?? 0)}</span>
         </label>
         <input
           id={id}
           type="range"
-          className="mt-1 w-full accent-[var(--color-brand)]"
+          className="w-full accent-[var(--color-brand)]"
           min={control.min ?? 0}
           max={control.max ?? 100}
           step={control.step ?? 1}
@@ -331,17 +1070,14 @@ function Knob({
   if (control.control === "event") return null;
 
   return (
-    <div className="min-w-0">
-      <label
-        htmlFor={id}
-        className="numeric block text-[0.625rem] uppercase tracking-wide text-graphite-soft"
-      >
+    <div className="flex min-w-0 flex-col gap-[7px]">
+      <label htmlFor={id} className={LABEL}>
         {label}
       </label>
       <input
         id={id}
         type="text"
-        className={`mt-1 ${FIELD}`}
+        className={FIELD}
         value={String(value ?? "")}
         onChange={(event) => onChange(event.target.value || undefined)}
       />
@@ -350,8 +1086,70 @@ function Knob({
 }
 
 /* ------------------------------------------------------------------ */
+/* Code                                                                */
+/* ------------------------------------------------------------------ */
 
-export function Playground({ name, controls }: { name: string; controls: readonly Control[] }) {
+/**
+ * The source for what the stage is showing.
+ *
+ * Built from the same props object the renderer receives, so the code and the
+ * component cannot disagree. A fixture knob names a dataset rather than a
+ * value, so it is written as an identifier and imported from the fixtures
+ * package — which is where a reader would get it.
+ */
+export function playgroundSource({
+  importName,
+  importFrom,
+  controls,
+  props,
+  arrayProps = [],
+  fixedAttrs = [],
+  fixedChildren,
+}: {
+  importName: string;
+  importFrom: string;
+  controls: readonly Control[];
+  props: Props;
+  arrayProps?: readonly string[];
+  fixedAttrs?: readonly string[];
+  fixedChildren?: string;
+}): string {
+  const fixtures: string[] = [];
+  const attrs: string[] = [...fixedAttrs];
+  for (const control of controls) {
+    if (control.control === "event") continue;
+    const value = props[control.prop];
+    const isFixture = control.control === "fixture" && typeof value === "string";
+    if (isFixture) fixtures.push(value as string);
+    const wrapped =
+      arrayProps.includes(control.prop) && typeof value === "string" ? [value] : value;
+    const attr = jsxAttr(control.prop, wrapped, isFixture);
+    if (attr) attrs.push(attr);
+  }
+  const imports = [
+    `import { ${importName} } from "${importFrom}";`,
+    ...(fixtures.length ? [`import { ${fixtures.join(", ")} } from "@zoblocks/fixtures";`] : []),
+  ].join("\n");
+  return `${imports}\n\nexport default function Example() {\n  return (\n    ${jsxElement(importName, attrs, "    ", fixedChildren)}\n  );\n}`;
+}
+
+/* ------------------------------------------------------------------ */
+
+export function Playground({
+  name,
+  controls,
+  importName,
+  importFrom,
+  links = [],
+}: {
+  name: string;
+  controls: readonly Control[];
+  /** The React export the code imports. Defaults to the component name in PascalCase. */
+  importName?: string;
+  /** Where the code imports it from. Defaults to the registry path. */
+  importFrom?: string;
+  links?: readonly DemoLink[];
+}) {
   if (process.env.NODE_ENV !== "production") {
     // The server decides whether to render this section from
     // PLAYGROUND_COMPONENTS; the renderers live here. Two lists is one more
@@ -374,8 +1172,8 @@ export function Playground({ name, controls }: { name: string; controls: readonl
     for (const control of knobs) {
       if (control.defaultValue !== undefined) props[control.prop] = control.defaultValue;
     }
-    return props;
-  }, [knobs]);
+    return normalise(name, props);
+  }, [knobs, name]);
 
   const [props, setProps] = React.useState<Props>(initial);
   const [log, setLog] = React.useState<string[]>([]);
@@ -397,96 +1195,136 @@ export function Playground({ name, controls }: { name: string; controls: readonl
     };
   }
 
-  return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
-      {/*
-        antd is themed by an algorithm in React, not by inherited CSS, so
-        without this the playground renders antd's light palette inside a dark
-        page — a white card with near-black text, in the one place on the page
-        a reader goes to see what the component actually looks like.
-      */}
-      <div
-        className="surface-2 min-w-0 rounded-2xl p-6"
-        style={dark ? { colorScheme: "dark" } : undefined}
-      >
-        {/*
-          The accent follows the design language.
+  const exportName =
+    importName ?? name.replace(/(^|-)([a-z])/g, (_, __, letter: string) => letter.toUpperCase());
+  const source = playgroundSource({
+    importName: exportName,
+    importFrom: importFrom ?? `@/components/zoblocks/${name}`,
+    controls,
+    props,
+    arrayProps: ARRAY_PROPS[name],
+    fixedAttrs: resolveFixed(FIXED_ATTRS[name], props),
+    fixedChildren: FIXED_CHILDREN[name],
+  });
 
-          It was pinned to ZoBlocks's, for a good reason at the time: with only
-          the algorithm set this rendered antd's #1677ff with white on it —
-          4.10:1, an AA failure. Under "Ant Design" that failure is now shown
-          rather than corrected, because a reader comparing frameworks should
-          see what antd actually ships.
-        */}
-        <ConfigProvider
-          theme={{
-            algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-            token: brand,
+  return (
+    <div className="flex flex-col gap-3.5">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            setProps(initial);
+            setLog([]);
           }}
+          className="rounded-md text-[13px] text-graphite transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
-          <PlaygroundBoundary resetKey={JSON.stringify(props)}>
-            {render(withHandlers)}
-          </PlaygroundBoundary>
-        </ConfigProvider>
+          Reset
+        </button>
       </div>
 
-      <div className="min-w-0">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="numeric text-[0.625rem] uppercase tracking-wide text-graphite-soft">
-            Props
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setProps(initial);
-              setLog([]);
-            }}
-            className="min-h-6 rounded-lg border border-rule px-2 text-xs text-graphite transition-colors hover:border-rule-strong hover:text-ink"
+      <div className="@container overflow-hidden rounded-xl border border-rule bg-paper">
+        <div className="flex flex-col @min-[680px]:flex-row">
+          {/*
+            antd is themed by an algorithm in React, not by inherited CSS, so
+            without this the playground renders antd's light palette inside a
+            dark page — a white card with near-black text, in the one place on
+            the page a reader goes to see what the component looks like.
+          */}
+          {/*
+            Scrolls rather than spills. A component wider than the stage — a
+            two-month range panel with its preset rail — otherwise drew over
+            the props panel beside it, where neither could be used.
+          */}
+          <div
+            className="zb-stage scroll-thin flex min-h-[360px] min-w-0 flex-1 items-center justify-center overflow-x-auto px-7 py-11"
+            style={dark ? { colorScheme: "dark" } : undefined}
           >
-            Reset
-          </button>
-        </div>
-
-        <div className="mt-3 space-y-4">
-          {knobs.map((control) => (
-            <Knob
-              key={control.prop}
-              control={control}
-              value={props[control.prop]}
-              onChange={(next) =>
-                setProps((previous) => {
-                  const updated = { ...previous };
-                  if (next === undefined) delete updated[control.prop];
-                  else updated[control.prop] = next;
-                  return updated;
-                })
-              }
-            />
-          ))}
-        </div>
-
-        {events.length > 0 && (
-          <div className="mt-5">
-            <p className="numeric text-[0.625rem] uppercase tracking-wide text-graphite-soft">
-              Events
-            </p>
-            {/* Polite, because an event log that interrupts is worse than one
-                nobody hears — the component under test is the thing being
-                driven, and its own announcements come first. */}
-            <ul
-              aria-live="polite"
-              className="mt-1 space-y-0.5 font-mono text-[0.6875rem] text-graphite"
-            >
-              {log.length === 0 ? (
-                <li className="text-graphite-soft">
-                  {events.map((e) => e.prop).join(", ")} — nothing yet
-                </li>
-              ) : (
-                log.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)
-              )}
-            </ul>
+            <div className="flex w-full min-w-0 flex-col gap-6">
+              {/*
+                The accent follows the design language. Under "Ant Design" an
+                AA failure in antd's own blue is shown rather than corrected,
+                because a reader comparing frameworks should see what antd ships.
+              */}
+              <ConfigProvider
+                theme={{
+                  algorithm: dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+                  token: brand,
+                }}
+              >
+                <PlaygroundBoundary resetKey={JSON.stringify(props)}>
+                  {render(withHandlers)}
+                </PlaygroundBoundary>
+              </ConfigProvider>
+            </div>
           </div>
-        )}
+
+          {/*
+            The panel is as tall as the stage's minimum and scrolls past it, so
+            a component with a dozen props does not stretch the stage into a
+            tall empty column. Focusable and named, because a region that
+            scrolls has to be reachable by keyboard.
+          */}
+          <div
+            role="region"
+            aria-label="Props"
+            tabIndex={0}
+            className="scroll-thin flex max-h-[360px] w-full flex-none flex-col gap-4 overflow-y-auto border-t border-rule bg-paper px-[18px] pb-[18px] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand @min-[680px]:w-60 @min-[680px]:border-l @min-[680px]:border-t-0"
+          >
+            <span className="sticky top-0 z-10 -mb-2 bg-paper pb-2 pt-[18px] text-xs font-medium text-graphite-soft">
+              Props
+            </span>
+            {knobs.map((control) => {
+              const optionsFor = DYNAMIC_OPTIONS[name]?.[control.prop];
+              const resolved: Control = optionsFor
+                ? { ...control, control: "select", options: optionsFor(props) }
+                : control;
+              return (
+                <Knob
+                  key={control.prop}
+                  control={resolved}
+                  value={props[control.prop]}
+                  onChange={(next) =>
+                    setProps((previous) => {
+                      const updated = { ...previous };
+                      if (next === undefined) delete updated[control.prop];
+                      else updated[control.prop] = next;
+                      return normalise(name, updated);
+                    })
+                  }
+                />
+              );
+            })}
+
+            {events.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-graphite-soft">Events</span>
+                {/* Polite, because an event log that interrupts is worse than
+                    one nobody hears — the component under test comes first. */}
+                <ul
+                  aria-live="polite"
+                  className="m-0 list-none space-y-0.5 p-0 font-mono text-[11px] text-graphite"
+                >
+                  {log.length === 0 ? (
+                    <li className="text-graphite-soft">
+                      {events.map((e) => e.prop).join(", ")} — nothing yet
+                    </li>
+                  ) : (
+                    log.map((entry, index) => <li key={`${entry}-${index}`}>{entry}</li>)
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex h-11 items-center justify-between gap-2 border-t border-rule bg-paper-sunk pl-3.5 pr-1.5">
+          <span className="min-w-0 truncate font-mono text-xs text-graphite">Playground.tsx</span>
+          <div className="flex flex-none items-center gap-0.5">
+            <CopyButton text={source} what="playground code" />
+            <PlatformLinks links={links} />
+          </div>
+        </div>
+        <CodeLines code={source} label="Playground code" />
       </div>
     </div>
   );
