@@ -211,6 +211,7 @@ export interface CoverageCardProps extends Omit<React.HTMLAttributes<HTMLDivElem
    * a reader is looking for.
    */
   windows: readonly CoverageWindow[];
+  /** ISO 8601, supplied by the host. The gap this component exists to find is a window in time. */
   now: string;
   /**
    * Who to reach when the primary does not answer. Rendered before it is needed rather than
@@ -328,6 +329,7 @@ export interface ChartCoPresenceProps extends Omit<
    * wins.
    */
   others: readonly ChartPresence[];
+  /** ISO 8601, supplied by the host. Adds "started … ago" to the conflict notice; omitted, the notice drops that clause. */
   now?: string;
   /** Opens the other person's draft, read-only. */
   onOpenTheirs?: (other: ChartPresence) => void;

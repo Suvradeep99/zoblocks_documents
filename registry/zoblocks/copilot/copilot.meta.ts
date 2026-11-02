@@ -131,4 +131,14 @@ import { lookUp, prepare } from "@zoblocks/copilot-core";
   // The most valuable prop in the API.
   suppressed={isAdministeringMedication || isSigningOrders}
 />`,
+
+  controls: [
+    {
+      prop: "announcementMode",
+      control: "segmented",
+      label: "Streaming announced as",
+      options: ["summary", "progressive"],
+      defaultValue: "summary",
+    },
+  ],
 });

@@ -211,6 +211,21 @@ export const DOCUMENTED_ORDER: readonly string[] = [
   "chart-context-menu",
   "data-grid",
   "care-timeline",
+  "identity",
+  "chart-command-palette",
+  "allergy-chip",
+  "care-team-presence",
+  "chart-accordion",
+  "chart-header",
+  "clinical-note",
+  "copilot",
+  "provenance-chip",
+  "recent-patient-stack",
+  "result-value",
+  "risk-indicator",
+  "safety-plan",
+  "timeline",
+  "trend-indicator",
 ];
 
 const DOCUMENTED = new Set(DOCUMENTED_ORDER);

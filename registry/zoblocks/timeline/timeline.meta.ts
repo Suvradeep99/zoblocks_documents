@@ -86,4 +86,22 @@ export default defineComponentMeta({
     { key: "3", title: "0.1.0", content: "Five loaders." },
   ]}
 />`,
+
+  controls: [
+    {
+      prop: "mode",
+      control: "segmented",
+      label: "Mode",
+      options: ["start", "end", "alternate"],
+      defaultValue: "start",
+    },
+    {
+      prop: "variant",
+      control: "segmented",
+      label: "Variant",
+      options: ["outlined", "filled"],
+      defaultValue: "outlined",
+    },
+    { prop: "reverse", control: "switch", label: "Newest first", defaultValue: false },
+  ],
 });

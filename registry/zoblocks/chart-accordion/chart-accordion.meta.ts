@@ -102,4 +102,15 @@ export default defineComponentMeta({
     },
   ]}
 />`,
+
+  controls: [
+    { prop: "toolbar", control: "switch", label: "Toolbar", defaultValue: true },
+    {
+      prop: "density",
+      control: "segmented",
+      label: "Density",
+      options: ["patient", "standard", "clinical"],
+      defaultValue: "clinical",
+    },
+  ],
 });
