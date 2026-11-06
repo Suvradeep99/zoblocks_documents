@@ -37,6 +37,13 @@ import * as PcDemo from "../provenance-chip-demos";
 import * as RpsDemo from "../recent-patient-stack-demos";
 import * as RvDemo from "../result-value-demos";
 import * as RiskDemo from "../risk-indicator-demos";
+import {
+  IdentityDisclosureDemo,
+  IdentityGuardDemo,
+  IdentityVerifyDemo,
+  IdentityWorklistDemo,
+} from "../identity-demo";
+import * as AllergyDemo from "../allergy-chip-demos";
 
 /* ------------------------------------------------------------------ */
 /* Stand-ins for the host application                                  */
@@ -484,6 +491,20 @@ export const EXAMPLE_PREVIEWS: Readonly<
     expired: () => <RiskDemo.ExpiredNotOld />,
     unscored: () => <RiskDemo.NotScoredIsNotLow />,
     concentration: () => <RiskDemo.ConcentrationDominance />,
+  },
+
+  identity: {
+    worklist: () => <IdentityWorklistDemo />,
+    verify: () => <IdentityVerifyDemo />,
+    disclosure: () => <IdentityDisclosureDemo />,
+    guard: () => <IdentityGuardDemo />,
+  },
+
+  "allergy-chip": {
+    "criticality-is-not-severity": () => <AllergyDemo.CriticalityIsNotSeverity />,
+    "two-empty-states": () => <AllergyDemo.TwoEmptyStates />,
+    intolerance: () => <AllergyDemo.Intolerance />,
+    refuted: () => <AllergyDemo.Refuted />,
   },
 };
 

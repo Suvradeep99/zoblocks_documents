@@ -13,11 +13,11 @@
  * change, because customers style against these names. The manifest is
  * committed so that change shows up as a reviewable diff.
  *
- * 361 tokens across 32 components:
+ * 363 tokens across 32 components:
  *
  *   switch          55
  *   tabs            44
- *   banner          39
+ *   banner          40
  *   accordion       29
  *   datetime        27
  *   badge           16
@@ -41,12 +41,12 @@
  *   value            3
  *   care-timeline    2
  *   presence         2
+ *   stack            2
  *   allergy          1
  *   chart-header     1
  *   patient-chip     1
  *   prov             1
  *   risk             1
- *   stack            1
  *
  * `bridgeable: false` (91 tokens) marks the ones resolving to clinical
  * status or an identity flag. A host framework's `colorError` is not our
@@ -1067,6 +1067,18 @@ export const TOKEN_SURFACE: readonly SurfaceEntry[] = [
     ],
     "fallback": true,
     "bridgeable": false
+  },
+  {
+    "name": "--zb-identity-on-accent",
+    "component": "banner",
+    "source": "packages/identity/src/styles.css",
+    "kind": "color",
+    "semantic": "--zb-text-on-accent",
+    "frameworks": [
+      "--ant-color-text-light-solid"
+    ],
+    "fallback": true,
+    "bridgeable": true
   },
   {
     "name": "--zb-identity-radius",
@@ -2543,6 +2555,16 @@ export const TOKEN_SURFACE: readonly SurfaceEntry[] = [
     "bridgeable": true
   },
   {
+    "name": "--zb-stack-accent-fg",
+    "component": "stack",
+    "source": "packages/react/src/styles.css",
+    "kind": "color",
+    "semantic": "--zb-stack-accent",
+    "frameworks": [],
+    "fallback": true,
+    "bridgeable": true
+  },
+  {
     "name": "--zb-surface-card-bg",
     "component": "surface-card",
     "source": "packages/tokens/tokens/component.json",
@@ -3831,6 +3853,7 @@ export const BRIDGEABLE: readonly string[] = [
   "--zb-identity-fill",
   "--zb-identity-fill-subtle",
   "--zb-identity-loop-skeleton",
+  "--zb-identity-on-accent",
   "--zb-identity-radius",
   "--zb-identity-radius-lg",
   "--zb-identity-surface",
@@ -3956,6 +3979,7 @@ export const BRIDGEABLE: readonly string[] = [
   "--zb-rv-value-default",
   "--zb-rv-value-size",
   "--zb-stack-accent",
+  "--zb-stack-accent-fg",
   "--zb-surface-card-bg",
   "--zb-surface-card-border",
   "--zb-surface-card-pad-x",

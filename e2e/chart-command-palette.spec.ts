@@ -1,6 +1,15 @@
 /**
  * ChartCommandPalette in a real browser.
  *
+ * The docs page for this component is a Playground page: there is no states
+ * rail to select a scenario from. Instead each documented Example
+ * (`chart-command-palette-demos.tsx`, registered under its example id in
+ * `example-registry.tsx`) mounts its own live, open palette against the same
+ * shared `CP_ITEMS`/`CP_SCOPE` fixture, inside an `#ex-<id>-panel-preview`
+ * tabpanel that is visible by default (its Preview/Code tab pair defaults to
+ * Preview). This spec opens the example whose fixture content and
+ * placeholder best match what each test demonstrates.
+ *
  * The docs preview is the fixture host: it provides the same patient scope,
  * search results, unavailable action, and clinically significant action that
  * the component documents.
@@ -15,13 +24,12 @@ import { expect, test, type Page } from "@playwright/test";
 
 const PAGE = "/components/chart-command-palette";
 
-async function selectScenario(page: Page, label: RegExp) {
+async function openExample(page: Page, exampleId: string) {
   await page.goto(PAGE);
   await page.waitForLoadState("networkidle");
 
-  await page.getByRole("tab", { name: label }).click();
-
-  const panel = page.getByRole("tabpanel").first();
+  const panel = page.locator(`#ex-${exampleId}-panel-preview`);
+  await panel.scrollIntoViewIfNeeded();
   await expect(panel).toBeVisible();
 
   const palette = panel.locator("[data-zb-palette]");
@@ -40,7 +48,7 @@ async function searchInput(palette: ReturnType<Page["locator"]>) {
 
 test.describe("@a11y chart command palette", () => {
   test("the empty palette does not disclose the size of the patient index", async ({ page }) => {
-    const { palette } = await selectScenario(page, /Counted, never named/);
+    const { palette } = await openExample(page, "counted");
 
     await expect(palette.getByRole("combobox")).toHaveValue("");
     await expect(palette.locator(".zb-palette__empty")).toContainText(/Type to search/);
@@ -52,7 +60,7 @@ test.describe("@a11y chart command palette", () => {
   });
 
   test("out-of-scope patients are counted but never named", async ({ page }) => {
-    const { palette } = await selectScenario(page, /Counted, never named/);
+    const { palette } = await openExample(page, "counted");
     const input = await searchInput(palette);
 
     await input.fill("oko");
@@ -72,7 +80,7 @@ test.describe("@a11y chart command palette", () => {
   });
 
   test("the combobox exposes its listbox and active option", async ({ page }) => {
-    const { palette } = await selectScenario(page, /Verbs first/);
+    const { palette } = await openExample(page, "verbs");
     const input = await searchInput(palette);
 
     await expect(input).toHaveAttribute("aria-expanded", "true");
@@ -101,7 +109,7 @@ test.describe("@a11y chart command palette", () => {
   });
 
   test("actions rank ahead of chart resources for a clinical search", async ({ page }) => {
-    const { palette } = await selectScenario(page, /Verbs first/);
+    const { palette } = await openExample(page, "verbs");
     const input = await searchInput(palette);
 
     await input.fill("phq");
@@ -123,7 +131,7 @@ test.describe("@a11y chart command palette", () => {
   test("Tab accepts an action that still needs an argument without running it", async ({
     page,
   }) => {
-    const { palette } = await selectScenario(page, /Verbs first/);
+    const { palette } = await openExample(page, "verbs");
     const input = await searchInput(palette);
 
     await input.fill("order lithium");
@@ -141,7 +149,7 @@ test.describe("@a11y chart command palette", () => {
   test("a clinically significant action asks for confirmation on the first Enter", async ({
     page,
   }) => {
-    const { palette } = await selectScenario(page, /Verbs first/);
+    const { palette } = await openExample(page, "verbs");
     const input = await searchInput(palette);
 
     await input.fill("discontinue lithium");
@@ -158,7 +166,7 @@ test.describe("@a11y chart command palette", () => {
   });
 
   test("an unavailable action stays visible with its reason", async ({ page }) => {
-    const { palette } = await selectScenario(page, /Verbs first/);
+    const { palette } = await openExample(page, "verbs");
     const input = await searchInput(palette);
 
     await input.fill("sign");
@@ -178,7 +186,7 @@ test.describe("@reflow chart command palette", () => {
   test("the documented palette remains visible at a 320px viewport", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
 
-    const { palette } = await selectScenario(page, /Counted, never named/);
+    const { palette } = await openExample(page, "counted");
     await expect(palette).toBeVisible();
 
     const input = await searchInput(palette);

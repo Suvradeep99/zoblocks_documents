@@ -1803,7 +1803,7 @@
 
 .zb-chart-accordion__count,
 .zb-chart-accordion__time {
-  color: var(--zb-text-subtle);
+  color: var(--zb-text-muted);
   font-size: var(--zb-text-sm);
   font-variant-numeric: tabular-nums;
 }
@@ -3891,9 +3891,17 @@ button.zb-rv:focus-visible {
   color: var(--zb-status-provisional, #0e7490);
 }
 
+/*
+ * Refuted and entered-in-error are drawn inside `[data-zb-inactive]`, which
+ * dims the whole chip to 0.75 opacity. `--zb-text-muted` already reads as
+ * secondary at full strength; composited through that dimming it drops
+ * under 4.5:1. `--zb-text` composited through the same 0.75 still reads as
+ * secondary — the dimming is what signals "past", not a second, pre-muted
+ * color on top of it — and clears AA with room to spare.
+ */
 .zb-allergy[data-zb-verification="refuted"] .zb-allergy__verification,
 .zb-allergy[data-zb-verification="entered-in-error"] .zb-allergy__verification {
-  color: var(--zb-text-subtle, var(--zb-text-muted, inherit));
+  color: var(--zb-text, inherit);
 }
 
 /* ---------------------------------------------------------------- */
@@ -3930,6 +3938,17 @@ button.zb-rv:focus-visible {
 
 .zb-allergy__when {
   color: var(--zb-text-subtle, var(--zb-text-muted, inherit));
+}
+
+/*
+ * Same dilution problem as the verification affix above: `[data-zb-inactive]`
+ * composites this through 0.75 opacity, and `--zb-text-subtle` does not
+ * survive that on top of its own low contrast. Scoped to the inactive chip
+ * only, so an active allergy's past-reaction note keeps the quieter
+ * `--zb-text-subtle` it already has room for.
+ */
+.zb-allergy[data-zb-inactive] .zb-allergy__when {
+  color: var(--zb-text, inherit);
 }
 
 .zb-allergy__manifestation[data-zb-none] {
@@ -5941,6 +5960,33 @@ button.zb-prov:focus-visible,
   --zb-stack-accent: var(--zb-text-muted, #64748b);
 }
 
+/*
+ * The avatar's initials sit on a 16%-opacity tint of this same hue. At that
+ * tint, only one of the eight accents clears AA (4.5:1) against the
+ * initials drawn in the full-strength accent — the tint lightens the
+ * background enough to undercut the accent's own luminance. Darkening the
+ * initials 20% toward black holds every one of the eight at 4.5:1 or above
+ * against that background (checked computationally for all eight), without
+ * dimming the brighter accent still used for the border and the active-tab
+ * ring. Dark and high-contrast already clear AA with the undarkened accent
+ * — their tokens are re-tuned for a dark surface — so they opt back out.
+ */
+.zb-stack__tab[data-zb-accent],
+.zb-stack__row[data-zb-accent] {
+  --zb-stack-accent-fg: color-mix(in srgb, var(--zb-stack-accent) 80%, black);
+}
+
+.dark .zb-stack__tab[data-zb-accent],
+.dark .zb-stack__row[data-zb-accent],
+[data-theme="dark"] .zb-stack__tab[data-zb-accent],
+[data-theme="dark"] .zb-stack__row[data-zb-accent],
+[data-zb-theme="dark"] .zb-stack__tab[data-zb-accent],
+[data-zb-theme="dark"] .zb-stack__row[data-zb-accent],
+[data-zb-theme="high-contrast"] .zb-stack__tab[data-zb-accent],
+[data-zb-theme="high-contrast"] .zb-stack__row[data-zb-accent] {
+  --zb-stack-accent-fg: var(--zb-stack-accent);
+}
+
 /* ---------------------------------------------------------------- */
 /* Tabs                                                              */
 /* ---------------------------------------------------------------- */
@@ -6005,7 +6051,7 @@ button.zb-prov:focus-visible,
    * chart's colour without the initials losing contrast against it.
    */
   background: color-mix(in srgb, var(--zb-stack-accent) 16%, transparent);
-  color: var(--zb-stack-accent);
+  color: var(--zb-stack-accent-fg, var(--zb-stack-accent));
   font-size: var(--zb-text-2xs, 0.6875rem);
   font-weight: 700;
   overflow: hidden;

@@ -123,9 +123,17 @@
   color: var(--zb-status-provisional, #0e7490);
 }
 
+/*
+ * Refuted and entered-in-error are drawn inside `[data-zb-inactive]`, which
+ * dims the whole chip to 0.75 opacity. `--zb-text-muted` already reads as
+ * secondary at full strength; composited through that dimming it drops
+ * under 4.5:1. `--zb-text` composited through the same 0.75 still reads as
+ * secondary — the dimming is what signals "past", not a second, pre-muted
+ * color on top of it — and clears AA with room to spare.
+ */
 .zb-allergy[data-zb-verification="refuted"] .zb-allergy__verification,
 .zb-allergy[data-zb-verification="entered-in-error"] .zb-allergy__verification {
-  color: var(--zb-text-subtle, var(--zb-text-muted, inherit));
+  color: var(--zb-text, inherit);
 }
 
 /* ---------------------------------------------------------------- */
@@ -162,6 +170,17 @@
 
 .zb-allergy__when {
   color: var(--zb-text-subtle, var(--zb-text-muted, inherit));
+}
+
+/*
+ * Same dilution problem as the verification affix above: `[data-zb-inactive]`
+ * composites this through 0.75 opacity, and `--zb-text-subtle` does not
+ * survive that on top of its own low contrast. Scoped to the inactive chip
+ * only, so an active allergy's past-reaction note keeps the quieter
+ * `--zb-text-subtle` it already has room for.
+ */
+.zb-allergy[data-zb-inactive] .zb-allergy__when {
+  color: var(--zb-text, inherit);
 }
 
 .zb-allergy__manifestation[data-zb-none] {
