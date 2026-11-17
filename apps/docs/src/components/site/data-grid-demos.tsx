@@ -14,7 +14,16 @@
  */
 
 import * as React from "react";
-import { ArrowDownUp, Ellipsis, Filter, Maximize2, Search, SlidersHorizontal } from "lucide-react";
+import {
+  ArrowDownUp,
+  ChevronsLeft,
+  ChevronsRight,
+  Ellipsis,
+  Filter,
+  Maximize2,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 import {
   DataGrid,
   type DataGridProps,
@@ -267,6 +276,7 @@ export function DataGridPlayground(props: Partial<GridProps>) {
   const [selected, setSelected] = React.useState<readonly string[]>([]);
   const [sort, setSort] = React.useState<GridSort | null>({ key: "risk", direction: "descending" });
   const [held, setHeld] = React.useState<readonly CaseloadRow[]>(ARRIVALS);
+  const [toolbarExpanded, setToolbarExpanded] = React.useState(true);
   const rows = CASELOAD_FULL.slice(0, 12);
   return (
     <Grid
@@ -306,23 +316,46 @@ export function DataGridPlayground(props: Partial<GridProps>) {
           </div>
 
           {/* Actions and view controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="group flex min-w-0 max-w-full flex-nowrap items-center justify-start gap-3 overflow-x-auto [&>*]:shrink-0 sm:flex-wrap sm:justify-end sm:overflow-visible">
+            {/* Collapse/Expand toolbar */}
             <button
               type="button"
-              aria-label="Filter"
-              title="Filter"
-              className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
+              aria-label={toolbarExpanded ? "Collapse toolbar" : "Expand toolbar"}
+              title={toolbarExpanded ? "Collapse toolbar" : "Expand toolbar"}
+              onClick={() => setToolbarExpanded((expanded) => !expanded)}
+              className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)] p-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--zb-grid-ink)]"
             >
-              <Filter size={16} />
+              {toolbarExpanded ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
             </button>
-            <button
-              type="button"
-              aria-label="Sort"
-              title="Sort"
-              className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
-            >
-              <ArrowDownUp size={16} />
-            </button>
+
+            {/* Separator after Collapse/Expand */}
+            <span aria-hidden="true" className="h-6 border-l border-[var(--zb-grid-rule)]" />
+
+            {toolbarExpanded && (
+              <>
+                {/* Filter */}
+                <button
+                  type="button"
+                  aria-label="Filter"
+                  title="Filter"
+                  className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
+                >
+                  <Filter size={16} />
+                </button>
+
+                {/* Sort */}
+                <button
+                  type="button"
+                  aria-label="Sort"
+                  title="Sort"
+                  className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
+                >
+                  <ArrowDownUp size={16} />
+                </button>
+              </>
+            )}
+
+            {/* Search remains visible in both states */}
             <button
               type="button"
               aria-label="Search"
@@ -332,15 +365,23 @@ export function DataGridPlayground(props: Partial<GridProps>) {
               <Search size={16} />
             </button>
 
-            <span className="mx-1 hidden h-6 border-l border-[var(--zb-grid-rule)] sm:block" />
+            {/* Separator after Search in both states */}
+            <span aria-hidden="true" className="h-6 border-l border-[var(--zb-grid-rule)]" />
 
-            <button
-              type="button"
-              aria-label="Full screen"
-              className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
-            >
-              <Maximize2 size={15} />
-            </button>
+            {toolbarExpanded && (
+              <>
+                {/* Full screen */}
+                <button
+                  type="button"
+                  aria-label="Full screen"
+                  className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
+                >
+                  <Maximize2 size={15} />
+                </button>
+              </>
+            )}
+
+            {/* View settings remains visible in both states */}
             <button
               type="button"
               aria-label="View settings"
@@ -348,11 +389,13 @@ export function DataGridPlayground(props: Partial<GridProps>) {
             >
               <SlidersHorizontal size={15} />
             </button>
+
+            {/* Show criteria remains visible in both states */}
             <button
               type="button"
               aria-label="Show criteria"
               title="Show criteria"
-              className="inline-flex items-center justify-center cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
+              className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)] p-2"
             >
               <svg
                 width={15}
@@ -363,7 +406,6 @@ export function DataGridPlayground(props: Partial<GridProps>) {
                 strokeWidth={2}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="block"
                 aria-hidden="true"
               >
                 <rect x="3" y="2" width="18" height="20" rx="2" />
