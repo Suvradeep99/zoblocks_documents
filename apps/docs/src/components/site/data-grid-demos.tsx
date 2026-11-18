@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import {
   DataGrid,
+  sortGridRows,
   type DataGridProps,
   type GridSort,
 } from "@/registry/zoblocks/data-grid/data-grid";
@@ -51,6 +52,71 @@ const rowKey = (row: CaseloadRow) => row.mrn;
 const identify = (row: CaseloadRow) => ({ primary: row.name, secondary: `MRN ${row.mrn}` });
 
 type GridProps = DataGridProps<CaseloadRow>;
+export type SearchableFieldKey =
+  "name" | "mrn" | "program" | "cssrs" | "risk" | "due" | "clinician";
+
+type SearchScopeField = {
+  key: SearchableFieldKey;
+  label: string;
+  disabled?: boolean;
+};
+
+export type SearchScopeConfig = {
+  fields: readonly SearchScopeField[];
+  selected: readonly SearchableFieldKey[];
+  zeroSelectedBehavior: "allow" | "block" | "default";
+  rerunOnSelectionChange?: boolean;
+  defaultSelected?: readonly SearchableFieldKey[];
+  onSelectionChange: (selected: readonly SearchableFieldKey[]) => void;
+  onSearch?: (query: string, selected: readonly SearchableFieldKey[]) => void | Promise<void>;
+};
+
+const SEARCHABLE_FIELD_VALUES: Record<SearchableFieldKey, (row: CaseloadRow) => string> = {
+  name: (row) => row.name,
+  mrn: (row) => row.mrn,
+  program: (row) => row.program,
+  cssrs: (row) => (typeof row.cssrs === "string" ? row.cssrs : ""),
+  risk: (row) => String(row.risk),
+  due: (row) => row.due,
+  clinician: (row) => row.clinician,
+};
+
+const DEFAULT_SEARCH_SCOPE: readonly SearchableFieldKey[] = [
+  "name",
+  "mrn",
+  "program",
+  "cssrs",
+  "risk",
+  "due",
+  "clinician",
+];
+
+function getEffectiveSearchScope(config?: SearchScopeConfig) {
+  if (!config) {
+    return { fields: DEFAULT_SEARCH_SCOPE, blocked: false };
+  }
+
+  const eligibleFields = config.fields.filter((field) => !field.disabled);
+  const eligibleKeys = new Set(eligibleFields.map((field) => field.key));
+
+  const selected = config.selected.filter((key) => eligibleKeys.has(key));
+
+  if (selected.length > 0) {
+    return { fields: selected, blocked: false };
+  }
+
+  if (config.zeroSelectedBehavior === "block") {
+    return { fields: [], blocked: true };
+  }
+
+  if (config.zeroSelectedBehavior === "default") {
+    const defaults = (config.defaultSelected ?? []).filter((key) => eligibleKeys.has(key));
+
+    return { fields: defaults, blocked: defaults.length === 0 };
+  }
+
+  return { fields: [], blocked: false };
+}
 
 /** The props every example shares; each overrides only what it is about. */
 const BASE = {
@@ -309,8 +375,13 @@ const SAVED_VIEW_CONFIGS: Record<SavedViewName, SavedViewConfig> = {
   },
 };
 
-export function DataGridPlayground(props: Partial<GridProps>) {
-  const { onSelectionChange, onSortChange, onAdmitArrivals, onReachEnd, ...rest } = props;
+type DataGridPlaygroundProps = Partial<GridProps> & {
+  searchScope?: SearchScopeConfig;
+};
+
+export function DataGridPlayground(props: DataGridPlaygroundProps) {
+  const { searchScope, onSelectionChange, onSortChange, onAdmitArrivals, onReachEnd, ...rest } =
+    props;
   const [selected, setSelected] = React.useState<readonly string[]>([]);
   const [sort, setSort] = React.useState<GridSort | null>({ key: "risk", direction: "descending" });
   const [held, setHeld] = React.useState<readonly CaseloadRow[]>(ARRIVALS);
@@ -336,13 +407,50 @@ export function DataGridPlayground(props: Partial<GridProps>) {
   const [draftSort, setDraftSort] = React.useState(["Priority · High to Low"]);
 
   // The pending action determines what happens after confirmation.
-  const [pendingExit, setPendingExit] = React.useState<"hide" | "cancel" | null>(null);
+  const [pendingExit, setPendingExit] = React.useState<"hide" | "cancel" | "view" | null>(null);
+  const [pendingView, setPendingView] = React.useState<SavedViewName | null>(null);
+  const [viewAnnouncement, setViewAnnouncement] = React.useState("");
+  const viewButtonRefs = React.useRef<Record<SavedViewName, HTMLButtonElement | null>>({
+    Overview: null,
+    Patients: null,
+    Appointments: null,
+  });
+  const focusSelectedViewRef = React.useRef(false);
   const keepEditingRef = React.useRef<HTMLButtonElement>(null);
   const discardChangesRef = React.useRef<HTMLButtonElement>(null);
   const exitTriggerRef = React.useRef<HTMLElement | null>(null);
   const sortButtonRef = React.useRef<HTMLButtonElement>(null);
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const [searchSettingsOpen, setSearchSettingsOpen] = React.useState(false);
+  const [searchScopeAnnouncement, setSearchScopeAnnouncement] = React.useState("");
+  const searchSettingsTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchResults, setSearchResults] = React.useState<CaseloadRow[] | null>(null);
+  const [searchPending, setSearchPending] = React.useState(false);
+  const [searchError, setSearchError] = React.useState<string | null>(null);
+  const [searchRetryCount, setSearchRetryCount] = React.useState(0);
+  const [searchResultCount, setSearchResultCount] = React.useState<number | null>(null);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const searchRequestRef = React.useRef(0);
+  const searchContainerRef = React.useRef<HTMLDivElement>(null);
+  const searchTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const shouldRestoreSearchFocusRef = React.useRef(true);
 
   const draftModified = JSON.stringify(draftSort) !== JSON.stringify(committedSort);
+  const getPrimarySort = (rules: readonly string[]): GridSort | null => {
+    switch (rules[0]) {
+      case "Priority · High to Low":
+        return { key: "risk", direction: "descending" };
+      case "Name · A to Z":
+        return { key: "name", direction: "ascending" };
+      case "Next Contact · Soonest first":
+        return { key: "due", direction: "ascending" };
+      case "Next Contact · Newest to Oldest":
+        return { key: "due", direction: "descending" };
+      default:
+        return null;
+    }
+  };
   const savedBaseline = savedViewConfigs[selectedView];
 
   const viewModified = JSON.stringify(viewConfig) !== JSON.stringify(savedBaseline);
@@ -351,24 +459,247 @@ export function DataGridPlayground(props: Partial<GridProps>) {
   React.useEffect(() => {
     if (pendingExit) {
       keepEditingRef.current?.focus();
-    } else if (exitTriggerRef.current) {
+      return;
+    }
+
+    if (focusSelectedViewRef.current) {
+      viewButtonRefs.current[selectedView]?.focus();
+      focusSelectedViewRef.current = false;
+      return;
+    }
+
+    if (exitTriggerRef.current) {
       exitTriggerRef.current.focus();
       exitTriggerRef.current = null;
     }
-  }, [pendingExit]);
+  }, [pendingExit, selectedView]);
+
+  React.useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [searchOpen]);
+
+  React.useEffect(() => {
+    if (!searchOpen) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (searchContainerRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      setSearchSettingsOpen(false);
+
+      // Preserve an active query when the user clicks elsewhere.
+      if (searchQuery.trim() !== "") {
+        return;
+      }
+
+      // Collapse only when the query is empty.
+      shouldRestoreSearchFocusRef.current = false;
+      setSearchOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+    };
+  }, [searchOpen, searchQuery]);
+
+  React.useEffect(() => {
+    if (!searchSettingsOpen) return;
+
+    const handleSettingsKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setSearchSettingsOpen(false);
+        searchSettingsTriggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleSettingsKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleSettingsKeyDown);
+    };
+  }, [searchSettingsOpen]);
+
+  const wasSearchOpenRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (wasSearchOpenRef.current && !searchOpen) {
+      if (shouldRestoreSearchFocusRef.current) {
+        searchTriggerRef.current?.focus();
+      }
+
+      shouldRestoreSearchFocusRef.current = true;
+    }
+
+    wasSearchOpenRef.current = searchOpen;
+  }, [searchOpen]);
+
+  const effectiveSearchScope = getEffectiveSearchScope(searchScope);
+  const effectiveScopeKey = JSON.stringify(effectiveSearchScope.fields);
+
+  const searchAuthorizationKey = JSON.stringify(
+    searchScope?.fields.filter((field) => !field.disabled).map((field) => field.key) ?? [],
+  );
+
+  const searchEffectScopeKey = searchScope?.rerunOnSelectionChange ? effectiveScopeKey : "";
+  const selectableSearchFields = searchScope?.fields ?? [];
+  const showSearchSettings = selectableSearchFields.filter((field) => !field.disabled).length > 1;
+  React.useEffect(() => {
+    if (!showSearchSettings) {
+      setSearchSettingsOpen(false);
+    }
+  }, [showSearchSettings]);
+  const handleSearchScopeToggle = (key: SearchableFieldKey, checked: boolean) => {
+    if (!searchScope) return;
+
+    const eligibleKeys = new Set(
+      searchScope.fields.filter((field) => !field.disabled).map((field) => field.key),
+    );
+
+    if (!eligibleKeys.has(key)) return;
+
+    const nextSelected = new Set(
+      searchScope.selected.filter((selectedKey) => eligibleKeys.has(selectedKey)),
+    );
+
+    if (checked) {
+      nextSelected.add(key);
+    } else {
+      nextSelected.delete(key);
+    }
+
+    if (nextSelected.size === 0 && searchScope.zeroSelectedBehavior === "block") {
+      return;
+    }
+
+    searchScope.onSelectionChange([...nextSelected]);
+    setSearchScopeAnnouncement("Search scope updated.");
+  };
+  React.useEffect(() => {
+    const requestId = ++searchRequestRef.current;
+    const query = searchQuery.trim().toLocaleLowerCase();
+
+    setSearchPending(false);
+
+    if (!query) {
+      setSearchResults(null);
+      setSearchResultCount(null);
+      setSearchError(null);
+
+      return () => {
+        if (searchRequestRef.current === requestId) {
+          searchRequestRef.current++;
+        }
+      };
+    }
+
+    let requestTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const debounceTimer = setTimeout(() => {
+      if (requestId !== searchRequestRef.current) return;
+
+      setSearchPending(true);
+      setSearchError(null);
+
+      requestTimer = setTimeout(async () => {
+        if (requestId !== searchRequestRef.current) return;
+
+        try {
+          if (effectiveSearchScope.blocked) {
+            throw new Error("No permitted search fields are available.");
+          }
+
+          // Await the host request. A rejection represents an incomplete search.
+          await searchScope?.onSearch?.(searchQuery.trim(), effectiveSearchScope.fields);
+
+          if (requestId !== searchRequestRef.current) return;
+
+          const matches = CASELOAD_FULL.filter((row) =>
+            effectiveSearchScope.fields.some((key) =>
+              SEARCHABLE_FIELD_VALUES[key](row).toLocaleLowerCase().includes(query),
+            ),
+          );
+
+          setSearchResults(matches);
+          setSearchResultCount(matches.length);
+          setSearchError(null);
+        } catch {
+          if (requestId !== searchRequestRef.current) return;
+
+          setSearchError("Search could not be completed. Please try again.");
+        } finally {
+          if (requestId === searchRequestRef.current) {
+            setSearchPending(false);
+          }
+        }
+      }, 350);
+    }, 300);
+
+    return () => {
+      clearTimeout(debounceTimer);
+
+      if (requestTimer !== undefined) {
+        clearTimeout(requestTimer);
+      }
+
+      if (searchRequestRef.current === requestId) {
+        searchRequestRef.current++;
+      }
+    };
+  }, [searchQuery, searchEffectScopeKey, searchAuthorizationKey, searchRetryCount]);
   const handleShowCriteria = () => {
     setCriteriaVisible(true);
     setEditorOpen(false);
   };
 
-  const handleSelectView = (view: SavedViewName) => {
-    setSelectedView(view);
-
+  const applyViewSelection = (view: SavedViewName) => {
     const nextConfig = savedViewConfigs[view];
 
+    // Invalidate any outstanding request from the outgoing view immediately.
+    searchRequestRef.current++;
+
+    // Temporary Search state is not part of the Saved View.
+    shouldRestoreSearchFocusRef.current = false;
+    setSearchSettingsOpen(false);
+    setSearchQuery("");
+    setSearchResults(null);
+    setSearchResultCount(null);
+    setSearchError(null);
+    setSearchPending(false);
+    setSearchOpen(false);
+
+    // Load the destination view's saved configuration.
+    setSelectedView(view);
     setViewConfig({ ...nextConfig });
     setCommittedSort([...nextConfig.sort]);
     setDraftSort([...nextConfig.sort]);
+    setSort(getPrimarySort(nextConfig.sort));
+    setSaveMenuOpen(false);
+    setEditorOpen(false);
+    setCriteriaVisible(true);
+
+    setPendingView(null);
+    setViewAnnouncement(`${view} view selected. Saved settings loaded.`);
+    focusSelectedViewRef.current = true;
+  };
+
+  const handleSelectView = (view: SavedViewName) => {
+    if (view === selectedView) return;
+
+    // Protect both unapplied editor changes and unsaved view-owned settings.
+    if (draftModified || viewModified) {
+      exitTriggerRef.current = document.activeElement as HTMLElement;
+      setPendingView(view);
+      setPendingExit("view");
+      return;
+    }
+
+    applyViewSelection(view);
   };
 
   const handleOpenEditor = () => {
@@ -399,15 +730,17 @@ export function DataGridPlayground(props: Partial<GridProps>) {
   };
 
   const handleKeepEditing = () => {
+    setPendingView(null);
     setPendingExit(null);
   };
 
   const handleDismissConfirmation = () => {
+    setPendingView(null);
     setPendingExit(null);
   };
-
   const handleDiscardChanges = () => {
     const exitAction = pendingExit;
+    const destination = pendingView;
 
     setDraftSort([...committedSort]);
     setPendingExit(null);
@@ -417,11 +750,14 @@ export function DataGridPlayground(props: Partial<GridProps>) {
       setCriteriaVisible(false);
     } else if (exitAction === "cancel") {
       setEditorOpen(false);
+    } else if (exitAction === "view" && destination) {
+      applyViewSelection(destination);
     }
   };
 
   const handleApplyCriteria = () => {
     setCommittedSort([...draftSort]);
+    setSort(getPrimarySort(draftSort));
     setViewConfig((current) => ({
       ...current,
       sort: [...draftSort],
@@ -446,10 +782,50 @@ export function DataGridPlayground(props: Partial<GridProps>) {
     setViewConfig({ ...baseline, sort: [...baseline.sort] });
     setCommittedSort([...baseline.sort]);
     setDraftSort([...baseline.sort]);
+    setSort(getPrimarySort(baseline.sort));
     setSaveMenuOpen(false);
   };
 
-  const rows = CASELOAD_FULL.slice(0, 12);
+  const sortRules: GridSort[] = committedSort.flatMap((label): GridSort[] => {
+    switch (label) {
+      case "Priority · High to Low":
+        return [{ key: "risk", direction: "descending" }];
+      case "Name · A to Z":
+        return [{ key: "name", direction: "ascending" }];
+      case "Next Contact · Soonest first":
+        return [{ key: "due", direction: "ascending" }];
+      case "Next Contact · Newest to Oldest":
+        return [{ key: "due", direction: "descending" }];
+      default:
+        return [];
+    }
+  });
+
+  const hasSearchQuery = searchQuery.trim().length > 0;
+
+  const showInitialSearchLoading = hasSearchQuery && searchPending && searchResults === null;
+
+  const showSearchError = hasSearchQuery && searchError !== null;
+
+  const showNoSearchResults =
+    hasSearchQuery &&
+    !searchPending &&
+    searchError === null &&
+    searchResults !== null &&
+    searchResults.length === 0;
+
+  const sortedRows = sortRules.reduceRight((currentRows, rule) => {
+    const column = CASELOAD_COLUMNS.find((candidate) => candidate.key === rule.key);
+    return sortGridRows(currentRows, column, rule.direction);
+  }, searchResults ?? CASELOAD_FULL);
+
+  const rows = showInitialSearchLoading ? [] : sortedRows.slice(0, 12);
+
+  const coverage = {
+    shown: rows.length,
+    total: searchResultCount ?? (hasSearchQuery ? ("unknown" as const) : CASELOAD_FULL.length),
+    noun: "clients",
+  };
   return (
     <>
       <div
@@ -468,14 +844,96 @@ export function DataGridPlayground(props: Partial<GridProps>) {
         <Grid
           columns={CASELOAD_COLUMNS_WIDE}
           rows={rows}
-          coverage={{ shown: rows.length, total: CASELOAD_FULL.length, noun: "clients" }}
+          coverage={coverage}
+          empty={
+            showInitialSearchLoading ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex flex-col items-center gap-2 py-5"
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--zb-grid-rule)] border-t-[var(--zb-grid-ink)]"
+                />
+                <h3 className="text-sm font-semibold text-ink">Searching Records...</h3>
+                <p className="text-xs text-[var(--zb-grid-muted)]">
+                  Searching the permitted fields. Please wait.
+                </p>
+              </div>
+            ) : showSearchError ? (
+              <div role="alert" className="flex flex-col items-center gap-2 py-5">
+                <span aria-hidden="true" className="text-lg text-red-600">
+                  !
+                </span>
+                <h3 className="text-sm font-semibold text-ink">Search Could Not Be Completed</h3>
+                <p className="max-w-sm text-xs text-[var(--zb-grid-muted)]">
+                  The search did not finish successfully. Check your connection and try again.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSearchRetryCount((count) => count + 1)}
+                  className="mt-1 cursor-pointer rounded-md border border-[var(--zb-grid-rule)] px-3 py-1.5 text-xs font-semibold text-ink hover:bg-[var(--zb-grid-sunk)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : showNoSearchResults ? (
+              <div role="status" className="flex flex-col items-center gap-2 py-5">
+                <h3 className="text-sm font-semibold text-ink">No Matching Records</h3>
+                <p className="text-xs text-[var(--zb-grid-muted)]">
+                  Try a different search term or broaden your search.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    searchInputRef.current?.focus();
+                  }}
+                  className="mt-1 cursor-pointer rounded-md border border-[var(--zb-grid-rule)] px-3 py-1.5 text-xs font-semibold text-ink hover:bg-[var(--zb-grid-sunk)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                >
+                  Clear Search
+                </button>
+              </div>
+            ) : undefined
+          }
+
+          bodyStatus={
+            showSearchError && searchResults && searchResults.length > 0 ? (
+              <div className="flex items-center justify-between gap-3 py-3">
+                <div role="alert" className="flex items-center gap-2">
+                  <span aria-hidden="true" className="text-lg text-red-600">
+                    !
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-ink">
+                      Search Could Not Be Completed
+                    </h3>
+                    <p className="text-xs text-[var(--zb-grid-muted)]">
+                      Previous results are still shown. Check your connection and try again.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSearchRetryCount((count) => count + 1)}
+                  className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] px-3 py-1.5 text-xs font-semibold text-ink hover:bg-[var(--zb-grid-sunk)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : undefined
+          }
 
           toolbar={
-            <div className="flex w-full flex-wrap items-center justify-between gap-3">
+            <div className="flex w-full flex-nowrap items-center justify-between gap-3">
               {/* Saved views */}
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
+                  ref={(node) => {
+                    viewButtonRefs.current.Overview = node;
+                  }}
                   className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs font-semibold ${
                     selectedView === "Overview"
                       ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)]"
@@ -488,6 +946,9 @@ export function DataGridPlayground(props: Partial<GridProps>) {
                 </button>
                 <button
                   type="button"
+                  ref={(node) => {
+                    viewButtonRefs.current.Patients = node;
+                  }}
                   className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs ${
                     selectedView === "Patients"
                       ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] font-semibold"
@@ -500,6 +961,9 @@ export function DataGridPlayground(props: Partial<GridProps>) {
                 </button>
                 <button
                   type="button"
+                  ref={(node) => {
+                    viewButtonRefs.current.Appointments = node;
+                  }}
                   className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs ${
                     selectedView === "Appointments"
                       ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] font-semibold"
@@ -518,6 +982,12 @@ export function DataGridPlayground(props: Partial<GridProps>) {
                   More
                 </button>
               </div>
+
+              {viewAnnouncement && (
+                <span className="sr-only" role="status" aria-live="polite">
+                  {viewAnnouncement}
+                </span>
+              )}
 
               {/* Actions and view controls */}
               <div className="group flex min-w-0 max-w-full flex-nowrap items-center justify-start gap-3 overflow-x-auto [&>*]:shrink-0 sm:flex-wrap sm:justify-end sm:overflow-visible">
@@ -617,14 +1087,138 @@ export function DataGridPlayground(props: Partial<GridProps>) {
                 )}
 
                 {/* Search remains visible in both states */}
-                <button
-                  type="button"
-                  aria-label="Search"
-                  title="Search"
-                  className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
-                >
-                  <Search size={16} />
-                </button>
+                {searchOpen ? (
+                  <div
+                    ref={searchContainerRef}
+                    className="group relative flex h-8 w-56 items-center"
+                  >
+                    <Search
+                      size={16}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-2 text-[var(--zb-grid-muted)]"
+                    />
+                    <label htmlFor="data-grid-search-input" className="sr-only">
+                      Search records
+                    </label>
+                    <input
+                      ref={searchInputRef}
+                      id="data-grid-search-input"
+                      type="text"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Search records..."
+                      className="h-8 w-full rounded-md border border-[var(--zb-grid-rule)] bg-paper pl-8 pr-16 text-xs text-ink outline-none focus-visible:border-[var(--zb-grid-ink)] focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]/20"
+                    />
+                    {showSearchSettings && (
+                      <>
+                        <button
+                          ref={searchSettingsTriggerRef}
+                          type="button"
+                          aria-label="Search settings"
+                          aria-expanded={searchSettingsOpen}
+                          aria-controls="data-grid-search-settings"
+                          title="Search settings"
+                          onClick={() => setSearchSettingsOpen((open) => !open)}
+                          className="absolute right-9 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--zb-grid-muted)] opacity-0 transition-opacity hover:bg-[var(--zb-grid-rule)] group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                        >
+                          <Ellipsis size={14} aria-hidden="true" />
+                        </button>
+
+                        {searchSettingsOpen && (
+                          <div
+                            id="data-grid-search-settings"
+                            className="absolute right-0 top-full z-30 mt-2 w-60 rounded-md border border-[var(--zb-grid-rule)] bg-paper p-3 shadow-lg"
+                          >
+                            <fieldset className="m-0 min-w-0 border-0 p-0">
+                              <legend className="mb-2 text-xs font-semibold text-ink">
+                                Search in
+                              </legend>
+
+                              <div className="flex flex-col gap-2">
+                                {selectableSearchFields.map((field) => {
+                                  const eligibleSelectedCount = searchScope!.selected.filter(
+                                    (key) =>
+                                      searchScope!.fields.some(
+                                        (candidate) => candidate.key === key && !candidate.disabled,
+                                      ),
+                                  ).length;
+
+                                  const preventsEmptySelection =
+                                    searchScope!.zeroSelectedBehavior === "block" &&
+                                    searchScope!.selected.includes(field.key) &&
+                                    eligibleSelectedCount <= 1;
+
+                                  return (
+                                    <label
+                                      key={field.key}
+                                      className="flex min-h-7 items-center gap-2 text-xs text-ink"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={searchScope!.selected.includes(field.key)}
+                                        disabled={field.disabled || preventsEmptySelection}
+                                        onChange={(event) =>
+                                          handleSearchScopeToggle(field.key, event.target.checked)
+                                        }
+                                        className="h-3.5 w-3.5 accent-[var(--zb-grid-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                                      />
+                                      <span
+                                        className={
+                                          field.disabled ? "text-[var(--zb-grid-muted)]" : ""
+                                        }
+                                      >
+                                        {field.label}
+                                        {field.disabled ? " (unavailable)" : ""}
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </fieldset>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {searchQuery.length > 0 && (
+                      <button
+                        type="button"
+                        aria-label="Clear Search"
+                        title="Clear Search"
+                        onClick={() => {
+                          setSearchQuery("");
+                          searchInputRef.current?.focus();
+                        }}
+                        className="absolute right-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-rule)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                      >
+                        ×
+                      </button>
+                    )}
+
+                    {searchPending ? (
+                      <span role="status" className="sr-only">
+                        Searching records
+                      </span>
+                    ) : searchResultCount !== null ? (
+                      <span role="status" className="sr-only">
+                        {searchResultCount} matching clients found
+                      </span>
+                    ) : null}
+                    <span role="status" aria-live="polite" className="sr-only">
+                      {searchScopeAnnouncement}
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    ref={searchTriggerRef}
+                    type="button"
+                    aria-label="Search"
+                    title="Search"
+                    onClick={() => setSearchOpen(true)}
+                    className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)]"
+                  >
+                    <Search size={16} aria-hidden="true" />
+                  </button>
+                )}
 
                 {/* Separator after Search in both states */}
                 <span aria-hidden="true" className="h-6 border-l border-[var(--zb-grid-rule)]" />
@@ -703,6 +1297,7 @@ export function DataGridPlayground(props: Partial<GridProps>) {
                     </button>
                     <button
                       type="button"
+                      disabled={draftSort.length === 0}
                       onClick={handleApplyCriteria}
                       className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold transition-colors hover:opacity-80"
                     >
@@ -762,7 +1357,7 @@ export function DataGridPlayground(props: Partial<GridProps>) {
             ) : null
           }
           criteria={
-            criteriaVisible && !editorOpen ? (
+            criteriaVisible ? (
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <button
                   type="button"
@@ -876,7 +1471,15 @@ export function DataGridPlayground(props: Partial<GridProps>) {
             </h2>
 
             <p id="discard-dialog-description" className="mt-2 text-sm text-[var(--zb-grid-muted)]">
-              You have unsaved Sort changes. Do you want to discard them?
+              {pendingExit === "view"
+                ? `Switching to ${pendingView ?? "another"} view will discard ${
+                    draftModified && viewModified
+                      ? "your unsaved Sort changes and view settings"
+                      : draftModified
+                        ? "your unsaved Sort changes"
+                        : "your unsaved view settings"
+                  }. Do you want to continue?`
+                : "You have unsaved Sort changes. Do you want to discard them?"}
             </p>
 
             <div className="mt-5 flex justify-end gap-2">

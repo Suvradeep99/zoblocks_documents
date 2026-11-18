@@ -192,6 +192,11 @@ export interface DataGridProps<Row> {
    * grid cannot, such as which filter to drop.
    */
   empty?: React.ReactNode;
+  /**
+   * Optional status row inside the table body, displayed alongside existing
+   * rows. Useful when a refresh fails but the previous results are retained.
+   */
+  bodyStatus?: React.ReactNode;
   /** The right-hand side of the masthead: a window, a source, a role. */
   note?: React.ReactNode;
 
@@ -413,6 +418,7 @@ export function DataGrid<Row>({
   masthead = true,
   footer = true,
   empty,
+  bodyStatus,
   selectedKeys,
   onSelectionChange,
   bulkActions,
@@ -943,9 +949,29 @@ export function DataGrid<Row>({
             {ordered.length === 0 ? (
               <tr role="row" aria-rowindex={2}>
                 <td className="zb-grid__emptycell" colSpan={columns.length + (selectable ? 1 : 0)}>
-                  <p className="zb-grid__empty" role="status">
-                    {empty ?? `No ${coverage.noun ?? "rows"} match.`}
-                  </p>
+                  {empty !== undefined && empty !== null ? (
+                    <div
+                      className="zb-grid__emptycontent"
+                      role={
+                        React.isValidElement(empty) && (empty.props as { role?: string }).role
+                          ? undefined
+                          : "status"
+                      }
+                    >
+                      {empty}
+                    </div>
+                  ) : (
+                    <p className="zb-grid__empty" role="status">
+                      No {coverage.noun ?? "rows"} match.
+                    </p>
+                  )}
+                </td>
+              </tr>
+            ) : null}
+            {bodyStatus !== undefined && bodyStatus !== null ? (
+              <tr role="row">
+                <td className="zb-grid__emptycell" colSpan={columns.length + (selectable ? 1 : 0)}>
+                  <div className="zb-grid__emptycontent">{bodyStatus}</div>
                 </td>
               </tr>
             ) : null}
