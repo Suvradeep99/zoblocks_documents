@@ -20,17 +20,21 @@ import {
   ChevronsRight,
   ChevronDown,
   ChevronUp,
+  Check,
   Ellipsis,
   Filter,
   Maximize2,
   Minimize2,
   Search,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 import {
   DataGrid,
   sortGridRows,
   type DataGridProps,
+  type DataGridGroup,
+  type DataGridColumnPinning,
   type GridSort,
 } from "@/registry/zoblocks/data-grid/data-grid";
 import {
@@ -48,6 +52,139 @@ import { CASELOAD_COLUMNS_DOC, CASELOAD_COLUMNS_WIDE } from "./caseload-columns"
 
 const CAPTION = "Clients on this team's caseload with a raised PHQ-9 or a recent risk screen";
 const TITLE = "Caseload · adult outpatient";
+type FilterFieldKey = "status" | "phq9" | "program" | "cssrs" | "risk" | "due";
+
+type FilterCondition = {
+  id: string;
+  field: FilterFieldKey;
+};
+
+type FilterUsage = {
+  simple: number;
+  advanced: number;
+};
+
+const FILTER_FIELDS: readonly { key: FilterFieldKey; label: string }[] = [
+  { key: "status", label: "Status" },
+  { key: "phq9", label: "PHQ-9" },
+  { key: "program", label: "Program" },
+  { key: "cssrs", label: "Risk Screen" },
+  { key: "risk", label: "Disengagement" },
+  { key: "due", label: "Next Contact" },
+];
+
+const INITIAL_SIMPLE_CONDITIONS: readonly FilterCondition[] = [
+  { id: "simple-status", field: "status" },
+];
+
+const INITIAL_ADVANCED_CONDITIONS: readonly FilterCondition[] = [
+  { id: "advanced-phq9", field: "phq9" },
+  { id: "advanced-status", field: "status" },
+  { id: "advanced-program", field: "program" },
+];
+
+function getFilterUsage(
+  simpleConditions: readonly FilterCondition[],
+  advancedConditions: readonly FilterCondition[],
+): Record<FilterFieldKey, FilterUsage> {
+  const usage = Object.fromEntries(
+    FILTER_FIELDS.map(({ key }) => [key, { simple: 0, advanced: 0 }]),
+  ) as Record<FilterFieldKey, FilterUsage>;
+
+  simpleConditions.forEach(({ field }) => {
+    usage[field].simple += 1;
+  });
+
+  advancedConditions.forEach(({ field }) => {
+    usage[field].advanced += 1;
+  });
+
+  return usage;
+}
+
+function getFilterUsageLabel(usage: FilterUsage): string {
+  const total = usage.simple + usage.advanced;
+
+  if (total === 0) return "Not currently used";
+
+  const sources = [
+    usage.simple > 0 ? "Simple" : null,
+    usage.advanced > 0 ? "Advanced" : null,
+  ].filter(Boolean);
+
+  return `Used in ${sources.join(" and ")} (${total})`;
+}
+
+type FilterFieldPickerProps = {
+  selectedField: FilterFieldKey | null;
+  usage: Record<FilterFieldKey, FilterUsage>;
+  onSelect: (field: FilterFieldKey) => void;
+  label: string;
+};
+
+function FilterFieldPicker({ selectedField, usage, onSelect, label }: FilterFieldPickerProps) {
+  const [query, setQuery] = React.useState("");
+
+  const visibleFields = FILTER_FIELDS.filter((field) =>
+    field.label.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  const pickerId = React.useId().replace(/:/g, "");
+
+  return (
+    <section aria-label={label} className="mt-3">
+      <label className="sr-only" htmlFor={`${pickerId}-field-search`}>
+        Search filter fields
+      </label>
+      <input
+        id={`${pickerId}-field-search`}
+        type="search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search fields"
+        className="mb-2 w-full rounded-md border border-[var(--zb-grid-rule)] bg-transparent px-3 py-2 text-sm"
+      />
+
+      <div className="grid gap-1">
+        {visibleFields.map((field) => {
+          const active = selectedField === field.key;
+          const usageId = `${pickerId}-${field.key}-usage`;
+
+          return (
+            <button
+              key={field.key}
+              type="button"
+              aria-pressed={active}
+              aria-describedby={usageId}
+              onClick={() => onSelect(field.key)}
+              className="flex min-w-0 w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-[var(--zb-grid-sunk)]"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block whitespace-normal break-words text-sm font-medium">
+                  {field.label}
+                </span>
+                <span
+                  id={usageId}
+                  className="block whitespace-normal break-words text-xs text-[var(--zb-grid-muted)]"
+                >
+                  {getFilterUsageLabel(usage[field.key])}
+                </span>
+              </span>
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                {active ? <Check size={16} aria-label="Selected" /> : null}
+              </span>
+            </button>
+          );
+        })}
+
+        {visibleFields.length === 0 ? (
+          <p className="px-3 py-2 text-sm text-[var(--zb-grid-muted)]">No matching fields.</p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 const rowKey = (row: CaseloadRow) => row.mrn;
 const identify = (row: CaseloadRow) => ({ primary: row.name, secondary: `MRN ${row.mrn}` });
 
@@ -354,14 +491,14 @@ type SavedViewConfig = {
 const SAVED_VIEW_CONFIGS: Record<SavedViewName, SavedViewConfig> = {
   Overview: {
     filter: "Active clients",
-    sort: ["Priority · High to Low"],
+    sort: ["PHQ-9 · High to Low"],
     groupBy: "Status",
     columns: "Wide",
     density: "Comfortable",
   },
   Patients: {
     filter: "All patients",
-    sort: ["Name · A to Z"],
+    sort: ["Name · A to Z", "PHQ-9 · High to Low"],
     groupBy: "None",
     columns: "All",
     density: "Compact",
@@ -383,7 +520,18 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
   const { searchScope, onSelectionChange, onSortChange, onAdmitArrivals, onReachEnd, ...rest } =
     props;
   const [selected, setSelected] = React.useState<readonly string[]>([]);
-  const [sort, setSort] = React.useState<GridSort | null>({ key: "risk", direction: "descending" });
+  const [sort, setSort] = React.useState<GridSort | null>({
+    key: "phq9",
+    direction: "descending",
+  });
+  const [group, setGroup] = React.useState<DataGridGroup | null>(null);
+  const [draftGroup, setDraftGroup] = React.useState<DataGridGroup | null>(null);
+  const [groupEditorOpen, setGroupEditorOpen] = React.useState(false);
+  const [groupAnnouncement, setGroupAnnouncement] = React.useState("");
+  const [columnPinning, setColumnPinning] = React.useState<DataGridColumnPinning>({});
+  const [hiddenColumns, setHiddenColumns] = React.useState<readonly string[]>([]);
+  const [manageColumnsOpen, setManageColumnsOpen] = React.useState(false);
+  const [columnSearch, setColumnSearch] = React.useState("");
   const [held, setHeld] = React.useState<readonly CaseloadRow[]>(ARRIVALS);
   const [toolbarExpanded, setToolbarExpanded] = React.useState(true);
   const [isFullScreen, setIsFullScreen] = React.useState(false);
@@ -401,15 +549,49 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
   const [editorOpen, setEditorOpen] = React.useState(false);
 
   // Previously committed Sort configuration
-  const [committedSort, setCommittedSort] = React.useState(["Priority · High to Low"]);
+  const [committedSort, setCommittedSort] = React.useState(["PHQ-9 · High to Low"]);
 
   // Current Editor draft
-  const [draftSort, setDraftSort] = React.useState(["Priority · High to Low"]);
+  const [draftSort, setDraftSort] = React.useState(["PHQ-9 · High to Low"]);
+
+  // Risk Screen Simple Filter: committed value and independent editor draft
+  const [committedRiskScreenValue, setCommittedRiskScreenValue] = React.useState<string | null>(
+    null,
+  );
+  const [draftRiskScreenValue, setDraftRiskScreenValue] = React.useState<string | null>(null);
+  const [riskScreenEditorOpen, setRiskScreenEditorOpen] = React.useState(false);
+
+  // Shared Simple and Advanced filter usage; drafts remain independent.
+  const [committedSimpleConditions, setCommittedSimpleConditions] =
+    React.useState<readonly FilterCondition[]>(INITIAL_SIMPLE_CONDITIONS);
+  const [draftSimpleConditions, setDraftSimpleConditions] =
+    React.useState<readonly FilterCondition[]>(INITIAL_SIMPLE_CONDITIONS);
+
+  const [committedAdvancedConditions, setCommittedAdvancedConditions] = React.useState<
+    readonly FilterCondition[]
+  >(INITIAL_ADVANCED_CONDITIONS);
+  const [draftAdvancedConditions, setDraftAdvancedConditions] = React.useState<
+    readonly FilterCondition[]
+  >(INITIAL_ADVANCED_CONDITIONS);
+
+  const [simplePickerOpen, setSimplePickerOpen] = React.useState(false);
+  const [activeSimpleConditionId, setActiveSimpleConditionId] = React.useState<string | null>(null);
+  const [advancedPickerConditionId, setAdvancedPickerConditionId] = React.useState<string | null>(
+    null,
+  );
+  const [advancedEditorOpen, setAdvancedEditorOpen] = React.useState(false);
 
   // The pending action determines what happens after confirmation.
-  const [pendingExit, setPendingExit] = React.useState<"hide" | "cancel" | "view" | null>(null);
+  const [pendingExit, setPendingExit] = React.useState<
+    "hide" | "cancel" | "view" | "filter" | "sort" | null
+  >(null);
   const [pendingView, setPendingView] = React.useState<SavedViewName | null>(null);
+  const [pendingSortAction, setPendingSortAction] = React.useState<{
+    sort: GridSort;
+    label: string;
+  } | null>(null);
   const [viewAnnouncement, setViewAnnouncement] = React.useState("");
+  const [sortAnnouncement, setSortAnnouncement] = React.useState("");
   const viewButtonRefs = React.useRef<Record<SavedViewName, HTMLButtonElement | null>>({
     Overview: null,
     Patients: null,
@@ -420,6 +602,11 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
   const discardChangesRef = React.useRef<HTMLButtonElement>(null);
   const exitTriggerRef = React.useRef<HTMLElement | null>(null);
   const sortButtonRef = React.useRef<HTMLButtonElement>(null);
+  const riskScreenValueRef = React.useRef<HTMLSelectElement>(null);
+  const manageColumnsTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const manageColumnsSearchRef = React.useRef<HTMLInputElement>(null);
+  const manageColumnsDrawerRef = React.useRef<HTMLElement>(null);
+  const wasManageColumnsOpenRef = React.useRef(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [searchSettingsOpen, setSearchSettingsOpen] = React.useState(false);
   const [searchScopeAnnouncement, setSearchScopeAnnouncement] = React.useState("");
@@ -437,28 +624,167 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
   const shouldRestoreSearchFocusRef = React.useRef(true);
 
   const draftModified = JSON.stringify(draftSort) !== JSON.stringify(committedSort);
+
+  const filterUsage = getFilterUsage(committedSimpleConditions, committedAdvancedConditions);
+
+  const openSimpleFieldPicker = () => {
+    setDraftSimpleConditions([...committedSimpleConditions]);
+    setActiveSimpleConditionId(null);
+    setSimplePickerOpen(true);
+    setCriteriaVisible(true);
+  };
+
+  const openAdvancedEditor = () => {
+    setDraftAdvancedConditions([...committedAdvancedConditions]);
+    setAdvancedPickerConditionId(null);
+    setAdvancedEditorOpen(true);
+    setCriteriaVisible(true);
+  };
+
+  const selectSimpleField = (field: FilterFieldKey) => {
+    const existing = draftSimpleConditions.find((condition) => condition.field === field);
+
+    if (existing) {
+      // Simple fields are unique: select the existing condition for editing.
+      setActiveSimpleConditionId(existing.id);
+      return;
+    }
+
+    const id = `simple-${field}`;
+    setDraftSimpleConditions((current) => [...current, { id, field }]);
+    setActiveSimpleConditionId(id);
+  };
+
+  const openAdvancedFieldPicker = (conditionId: string) => {
+    setAdvancedPickerConditionId(conditionId);
+  };
+
+  const selectAdvancedField = (field: FilterFieldKey) => {
+    if (!advancedPickerConditionId) return;
+
+    // Advanced conditions may reuse a field; only the owning draft changes.
+    setDraftAdvancedConditions((current) =>
+      current.map((condition) =>
+        condition.id === advancedPickerConditionId ? { ...condition, field } : condition,
+      ),
+    );
+  };
+
+  const applySimpleConditions = () => {
+    setCommittedSimpleConditions([...draftSimpleConditions]);
+    setSimplePickerOpen(false);
+    setActiveSimpleConditionId(null);
+  };
+
+  const applyAdvancedConditions = () => {
+    setCommittedAdvancedConditions([...draftAdvancedConditions]);
+    setAdvancedPickerConditionId(null);
+    setAdvancedEditorOpen(false);
+  };
+
   const getPrimarySort = (rules: readonly string[]): GridSort | null => {
     switch (rules[0]) {
       case "Priority · High to Low":
         return { key: "risk", direction: "descending" };
+      case "Priority · Low to High":
+        return { key: "risk", direction: "ascending" };
       case "Name · A to Z":
         return { key: "name", direction: "ascending" };
+      case "Name · Z to A":
+        return { key: "name", direction: "descending" };
       case "Next Contact · Soonest first":
         return { key: "due", direction: "ascending" };
       case "Next Contact · Newest to Oldest":
         return { key: "due", direction: "descending" };
+      case "PHQ-9 · High to Low":
+        return { key: "phq9", direction: "descending" };
+      case "PHQ-9 · Low to High":
+        return { key: "phq9", direction: "ascending" };
+      case "Risk Screen · Declared order":
+        return { key: "cssrs", direction: "ascending" };
+      case "Risk Screen · Reverse declared order":
+        return { key: "cssrs", direction: "descending" };
       default:
         return null;
     }
   };
   const savedBaseline = savedViewConfigs[selectedView];
 
+  const getGroupFieldLabel = (key: string) => {
+    switch (key) {
+      case "cssrs":
+        return "Risk Screen";
+      case "program":
+        return "Program";
+      default:
+        return key;
+    }
+  };
+
+  const getGroupDirectionLabel = (direction: DataGridGroup["direction"]) =>
+    direction === "ascending" ? "A to Z" : "Z to A";
+
+  const handleCommitGroup = (nextGroup: DataGridGroup | null) => {
+    setGroup(nextGroup);
+    setGroupAnnouncement(
+      nextGroup
+        ? `Grouped by ${getGroupFieldLabel(nextGroup.key)}, ${getGroupDirectionLabel(nextGroup.direction)}.`
+        : "Grouping cleared.",
+    );
+  };
+
+  const handleOpenGroupEditor = () => {
+    setDraftGroup(group);
+    setGroupEditorOpen(true);
+    setCriteriaVisible(true);
+  };
+
+  const handleApplyGroup = () => {
+    handleCommitGroup(draftGroup);
+    setGroupEditorOpen(false);
+  };
+
+  const handleCancelGroupEditor = () => {
+    setDraftGroup(group);
+    setGroupEditorOpen(false);
+  };
+
+  const handleOpenRiskScreenFilter = (columnKey: string) => {
+    if (columnKey !== "cssrs") return;
+    if (riskScreenEditorOpen) return;
+
+    // Protect an unapplied Sort draft before switching editors.
+    if (editorOpen && draftModified) {
+      exitTriggerRef.current = document.activeElement as HTMLElement;
+      setPendingExit("filter");
+      return;
+    }
+
+    setEditorOpen(false);
+    setCriteriaVisible(true);
+    setDraftRiskScreenValue(committedRiskScreenValue);
+    setRiskScreenEditorOpen(true);
+  };
+
+  const handleApplyRiskScreenFilter = () => {
+    if (!draftRiskScreenValue) return;
+
+    setCommittedRiskScreenValue(draftRiskScreenValue);
+    setRiskScreenEditorOpen(false);
+  };
+
   const viewModified = JSON.stringify(viewConfig) !== JSON.stringify(savedBaseline);
 
   const isProtectedView = selectedView === "Overview";
   React.useEffect(() => {
     if (pendingExit) {
-      keepEditingRef.current?.focus();
+      if (pendingExit === "sort") {
+        requestAnimationFrame(() => {
+          keepEditingRef.current?.focus();
+        });
+      } else {
+        keepEditingRef.current?.focus();
+      }
       return;
     }
 
@@ -473,6 +799,22 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
       exitTriggerRef.current = null;
     }
   }, [pendingExit, selectedView]);
+
+  React.useEffect(() => {
+    if (riskScreenEditorOpen) {
+      riskScreenValueRef.current?.focus();
+    }
+  }, [riskScreenEditorOpen]);
+
+  React.useEffect(() => {
+    if (manageColumnsOpen) {
+      manageColumnsSearchRef.current?.focus();
+      wasManageColumnsOpenRef.current = true;
+    } else if (wasManageColumnsOpenRef.current) {
+      manageColumnsTriggerRef.current?.focus();
+      wasManageColumnsOpenRef.current = false;
+    }
+  }, [manageColumnsOpen]);
 
   React.useEffect(() => {
     if (searchOpen) {
@@ -709,13 +1051,17 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
   };
 
   const handleHideCriteria = () => {
-    if (editorOpen && draftModified) {
+    const riskScreenDraftModified =
+      riskScreenEditorOpen && draftRiskScreenValue !== committedRiskScreenValue;
+
+    if ((editorOpen && draftModified) || riskScreenDraftModified) {
       exitTriggerRef.current = document.activeElement as HTMLElement;
       setPendingExit("hide");
       return;
     }
 
     setEditorOpen(false);
+    setRiskScreenEditorOpen(false);
     setCriteriaVisible(false);
   };
 
@@ -731,25 +1077,52 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
 
   const handleKeepEditing = () => {
     setPendingView(null);
+    setPendingSortAction(null);
     setPendingExit(null);
   };
 
   const handleDismissConfirmation = () => {
     setPendingView(null);
+    setPendingSortAction(null);
     setPendingExit(null);
   };
   const handleDiscardChanges = () => {
     const exitAction = pendingExit;
     const destination = pendingView;
+    const sortAction = pendingSortAction;
+
+    if (exitAction === "sort" && sortAction) {
+      onSortChange?.(sortAction.sort);
+
+      setDraftSort([...committedSort]);
+      setPendingExit(null);
+      setCommittedSort([sortAction.label]);
+      setSort(sortAction.sort);
+      setViewConfig((current) => ({
+        ...current,
+        sort: [sortAction.label],
+      }));
+      setEditorOpen(false);
+      setPendingSortAction(null);
+      setSortAnnouncement(`Sort draft discarded. ${sortAction.label} applied.`);
+      return;
+    }
 
     setDraftSort([...committedSort]);
     setPendingExit(null);
 
     if (exitAction === "hide") {
       setEditorOpen(false);
+      setRiskScreenEditorOpen(false);
+      setDraftRiskScreenValue(committedRiskScreenValue);
       setCriteriaVisible(false);
     } else if (exitAction === "cancel") {
       setEditorOpen(false);
+    } else if (exitAction === "filter") {
+      setEditorOpen(false);
+      setCriteriaVisible(true);
+      setDraftRiskScreenValue(committedRiskScreenValue);
+      setRiskScreenEditorOpen(true);
     } else if (exitAction === "view" && destination) {
       applyViewSelection(destination);
     }
@@ -786,16 +1159,70 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
     setSaveMenuOpen(false);
   };
 
+  const handleHeaderSortChange = (next: GridSort | null) => {
+    if (!next) return;
+
+    const labelByKey: Record<string, (direction: GridSort["direction"]) => string> = {
+      name: (direction) => (direction === "ascending" ? "Name · A to Z" : "Name · Z to A"),
+      phq9: (direction) =>
+        direction === "descending" ? "PHQ-9 · High to Low" : "PHQ-9 · Low to High",
+      cssrs: (direction) =>
+        direction === "ascending"
+          ? "Risk Screen · Declared order"
+          : "Risk Screen · Reverse declared order",
+      risk: (direction) =>
+        direction === "descending" ? "Priority · High to Low" : "Priority · Low to High",
+      due: (direction) =>
+        direction === "ascending"
+          ? "Next Contact · Soonest first"
+          : "Next Contact · Newest to Oldest",
+    };
+
+    const nextLabel = labelByKey[next.key]?.(next.direction);
+    if (!nextLabel) return;
+
+    const nextCommittedSort = [nextLabel];
+    const changesCommittedSort =
+      JSON.stringify(nextCommittedSort) !== JSON.stringify(committedSort);
+
+    if (editorOpen && draftModified && changesCommittedSort) {
+      setPendingSortAction({ sort: next, label: nextLabel });
+      setPendingExit("sort");
+      return;
+    }
+
+    onSortChange?.(next);
+    setCommittedSort(nextCommittedSort);
+    setSort(getPrimarySort(nextCommittedSort));
+    setViewConfig((current) => ({
+      ...current,
+      sort: nextCommittedSort,
+    }));
+    setSortAnnouncement(`Sorted by ${nextLabel}.`);
+  };
+
   const sortRules: GridSort[] = committedSort.flatMap((label): GridSort[] => {
     switch (label) {
       case "Priority · High to Low":
         return [{ key: "risk", direction: "descending" }];
+      case "Priority · Low to High":
+        return [{ key: "risk", direction: "ascending" }];
       case "Name · A to Z":
         return [{ key: "name", direction: "ascending" }];
+      case "Name · Z to A":
+        return [{ key: "name", direction: "descending" }];
       case "Next Contact · Soonest first":
         return [{ key: "due", direction: "ascending" }];
       case "Next Contact · Newest to Oldest":
         return [{ key: "due", direction: "descending" }];
+      case "PHQ-9 · High to Low":
+        return [{ key: "phq9", direction: "descending" }];
+      case "PHQ-9 · Low to High":
+        return [{ key: "phq9", direction: "ascending" }];
+      case "Risk Screen · Declared order":
+        return [{ key: "cssrs", direction: "ascending" }];
+      case "Risk Screen · Reverse declared order":
+        return [{ key: "cssrs", direction: "descending" }];
       default:
         return [];
     }
@@ -842,7 +1269,10 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
         }}
       >
         <Grid
-          columns={CASELOAD_COLUMNS_WIDE}
+          columns={(selectedView === "Patients"
+            ? CASELOAD_COLUMNS_DOC
+            : CASELOAD_COLUMNS_WIDE
+          ).filter((column) => !hiddenColumns.includes(column.key))}
           rows={rows}
           coverage={coverage}
           empty={
@@ -1083,6 +1513,257 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                     >
                       <ArrowDownUp size={16} />
                     </button>
+
+                    {/* Manage columns */}
+                    <button
+                      ref={manageColumnsTriggerRef}
+                      type="button"
+                      aria-expanded={manageColumnsOpen}
+                      onClick={() => setManageColumnsOpen(true)}
+                      className={`cursor-pointer rounded-md border px-3 py-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2 ${
+                        manageColumnsOpen
+                          ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)]"
+                          : "border-[var(--zb-grid-rule)]"
+                      }`}
+                    >
+                      Manage columns
+                    </button>
+
+                    {/* Manage columns drawer */}
+                    {manageColumnsOpen && (
+                      <div className="fixed inset-0 z-[100]">
+                        {/* Backdrop */}
+                        <button
+                          type="button"
+                          aria-label="Close manage columns panel"
+                          onClick={() => setManageColumnsOpen(false)}
+                          className="absolute inset-0 bg-black/30"
+                        />
+
+                        {/* Drawer */}
+                        <aside
+                          ref={manageColumnsDrawerRef}
+                          role="dialog"
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              setManageColumnsOpen(false);
+                              return;
+                            }
+
+                            if (event.key !== "Tab") return;
+
+                            const focusableElements =
+                              event.currentTarget.querySelectorAll<HTMLElement>(
+                                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                              );
+
+                            const firstElement = focusableElements[0];
+                            const lastElement = focusableElements[focusableElements.length - 1];
+
+                            if (!firstElement || !lastElement) {
+                              event.preventDefault();
+                              return;
+                            }
+
+                            if (event.shiftKey && document.activeElement === firstElement) {
+                              event.preventDefault();
+                              lastElement.focus();
+                            } else if (!event.shiftKey && document.activeElement === lastElement) {
+                              event.preventDefault();
+                              firstElement.focus();
+                            }
+                          }}
+                          aria-modal="true"
+                          aria-labelledby="manage-columns-title"
+                          className="absolute inset-y-0 right-0 flex w-full max-w-sm flex-col border-l border-[var(--zb-grid-rule)] bg-paper shadow-2xl"
+                        >
+                          {/* Header */}
+                          <div className="flex items-center justify-between border-b border-[var(--zb-grid-rule)] px-5 py-4">
+                            <div>
+                              <h2
+                                id="manage-columns-title"
+                                className="text-sm font-semibold text-ink"
+                              >
+                                Manage columns
+                              </h2>
+                              <p className="mt-1 text-xs text-[var(--zb-grid-muted)]">
+                                Choose which columns appear in the grid.
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              aria-label="Close"
+                              onClick={() => setManageColumnsOpen(false)}
+                              className="rounded-md p-2 text-[var(--zb-grid-muted)] outline-none transition-colors hover:bg-[var(--zb-grid-sunk)] hover:text-ink focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+
+                          {/* Search columns */}
+                          <div className="border-b border-[var(--zb-grid-rule)] px-5 py-3">
+                            <div className="relative">
+                              <Search
+                                size={16}
+                                aria-hidden="true"
+                                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--zb-grid-muted)]"
+                              />
+                              <input
+                                ref={manageColumnsSearchRef}
+                                type="text"
+                                value={columnSearch}
+                                onChange={(event) => setColumnSearch(event.target.value)}
+                                placeholder="Search columns..."
+                                aria-label="Search columns"
+                                className="h-9 w-full rounded-md border border-[var(--zb-grid-rule)] bg-paper pl-9 pr-3 text-xs text-ink outline-none placeholder:text-[var(--zb-grid-muted)] focus-visible:border-[var(--zb-grid-ink)] focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]/20"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Column lists */}
+                          <div className="flex-1 space-y-6 overflow-y-auto p-5">
+                            {(() => {
+                              const columns =
+                                selectedView === "Patients"
+                                  ? CASELOAD_COLUMNS_DOC
+                                  : CASELOAD_COLUMNS_WIDE;
+
+                              const searchTerm = columnSearch.trim().toLowerCase();
+
+                              const visibleColumns = columns.filter(
+                                (column) =>
+                                  !hiddenColumns.includes(column.key) &&
+                                  column.header.toLowerCase().includes(searchTerm),
+                              );
+
+                              const hidden = columns.filter(
+                                (column) =>
+                                  hiddenColumns.includes(column.key) &&
+                                  column.header.toLowerCase().includes(searchTerm),
+                              );
+
+                              return (
+                                <>
+                                  {/* Visible columns */}
+                                  <section>
+                                    <div className="mb-3 flex items-center justify-between">
+                                      <h3 className="text-xs font-semibold text-ink">
+                                        Visible columns
+                                      </h3>
+                                      <span className="text-xs text-[var(--zb-grid-muted)]">
+                                        {visibleColumns.length}
+                                      </span>
+                                    </div>
+
+                                    {visibleColumns.length > 0 ? (
+                                      <div className="flex flex-col gap-3">
+                                        {visibleColumns.map((column) => (
+                                          <label
+                                            key={column.key}
+                                            className="flex cursor-pointer items-center gap-3 text-xs text-ink"
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked
+                                              onChange={() =>
+                                                setHiddenColumns((current) => [
+                                                  ...current,
+                                                  column.key,
+                                                ])
+                                              }
+                                              className="accent-[var(--zb-grid-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
+                                            />
+                                            <span>{column.header}</span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-[var(--zb-grid-muted)]">
+                                        {columnSearch.trim()
+                                          ? "No matching visible columns."
+                                          : "No visible columns."}
+                                      </p>
+                                    )}
+                                  </section>
+
+                                  <div className="border-t border-[var(--zb-grid-rule)]" />
+
+                                  {/* Hidden columns */}
+                                  <section>
+                                    <div className="mb-3 flex items-center justify-between">
+                                      <h3 className="text-xs font-semibold text-ink">
+                                        Hidden columns
+                                      </h3>
+                                      <span className="text-xs text-[var(--zb-grid-muted)]">
+                                        {hidden.length}
+                                      </span>
+                                    </div>
+
+                                    {hidden.length > 0 ? (
+                                      <div className="flex flex-col gap-3">
+                                        {hidden.map((column) => (
+                                          <label
+                                            key={column.key}
+                                            className="flex cursor-pointer items-center gap-3 text-xs text-ink"
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={false}
+                                              onChange={() =>
+                                                setHiddenColumns((current) =>
+                                                  current.filter((key) => key !== column.key),
+                                                )
+                                              }
+                                              className="accent-[var(--zb-grid-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
+                                            />
+                                            <span>{column.header}</span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-xs text-[var(--zb-grid-muted)]">
+                                        {columnSearch.trim()
+                                          ? "No matching hidden columns."
+                                          : "No hidden columns."}
+                                      </p>
+                                    )}
+                                  </section>
+                                </>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Footer */}
+                          <div className="flex items-center justify-between border-t border-[var(--zb-grid-rule)] px-5 py-4">
+                            <span className="text-xs text-[var(--zb-grid-muted)]">
+                              {(() => {
+                                const columns =
+                                  selectedView === "Patients"
+                                    ? CASELOAD_COLUMNS_DOC
+                                    : CASELOAD_COLUMNS_WIDE;
+
+                                return columns.filter((column) =>
+                                  hiddenColumns.includes(column.key),
+                                ).length;
+                              })()}{" "}
+                              columns hidden
+                            </span>
+
+                            <button
+                              type="button"
+                              disabled={hiddenColumns.length === 0}
+                              onClick={() => setHiddenColumns([])}
+                              className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] px-3 py-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              Restore all
+                            </button>
+                          </div>
+                        </aside>
+                      </div>
+                    )}
                   </>
                 )}
 
@@ -1283,97 +1964,389 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
           }
 
           filterPanel={
-            criteriaVisible && editorOpen ? (
-              <div className="rounded-lg border border-[var(--zb-grid-rule)] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-sm font-semibold">Sort configuration</span>
-                  <div className="flex gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={handleCancelEditor}
-                      className="cursor-pointer rounded-md px-3 py-1.5 text-[var(--zb-grid-muted)] transition-colors hover:bg-[var(--zb-grid-sunk)]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={draftSort.length === 0}
-                      onClick={handleApplyCriteria}
-                      className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold transition-colors hover:opacity-80"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>
+            criteriaVisible ? (
+              <>
+                {editorOpen ? (
+                  <div className="rounded-lg border border-[var(--zb-grid-rule)] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="text-sm font-semibold">Sort configuration</span>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={handleCancelEditor}
+                          className="cursor-pointer rounded-md px-3 py-1.5 text-[var(--zb-grid-muted)] transition-colors hover:bg-[var(--zb-grid-sunk)]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={draftSort.length === 0 || !draftModified}
+                          onClick={handleApplyCriteria}
+                          className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold transition-colors hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:opacity-100"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
 
-                <p className="mt-3 text-xs text-[var(--zb-grid-muted)]">
-                  Sorts are applied from top to bottom.
-                </p>
+                    <p className="mt-3 text-xs text-[var(--zb-grid-muted)]">
+                      Sorts are applied from top to bottom.
+                    </p>
 
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {draftSort.map((item, index) => (
-                    <div
-                      key={`${item}-${index}`}
-                      className="flex items-center justify-between gap-2 rounded-md border border-[var(--zb-grid-rule)] p-3 text-xs"
-                    >
-                      <span>{item}</span>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {draftSort.map((item, index) => (
+                        <div
+                          key={`${item}-${index}`}
+                          className="flex items-center justify-between gap-2 rounded-md border border-[var(--zb-grid-rule)] p-3 text-xs"
+                        >
+                          <span>{item}</span>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${item}`}
+                            title="Remove sort"
+                            onClick={() =>
+                              setDraftSort((current) => current.filter((_, i) => i !== index))
+                            }
+                            className="cursor-pointer text-[var(--zb-grid-muted)] hover:text-[var(--zb-grid-ink)]"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 flex gap-3 text-xs">
                       <button
                         type="button"
-                        aria-label={`Remove ${item}`}
-                        title="Remove sort"
                         onClick={() =>
-                          setDraftSort((current) => current.filter((_, i) => i !== index))
+                          setDraftSort((current) =>
+                            current.includes("Next Contact · Newest to Oldest")
+                              ? current
+                              : [...current, "Next Contact · Newest to Oldest"],
+                          )
                         }
-                        className="cursor-pointer text-[var(--zb-grid-muted)] hover:text-[var(--zb-grid-ink)]"
+                        className="cursor-pointer font-medium text-[var(--zb-grid-muted)] transition-colors hover:text-[var(--zb-grid-ink)]"
                       >
-                        ×
+                        + Add Sort
+                      </button>
+                      <button
+                        type="button"
+                        className="cursor-pointer text-[var(--zb-grid-muted)] transition-colors hover:text-[var(--zb-grid-ink)]"
+                      >
+                        Clear All
                       </button>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ) : null}
 
-                <div className="mt-3 flex gap-3 text-xs">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setDraftSort((current) =>
-                        current.includes("Next Contact · Newest to Oldest")
-                          ? current
-                          : [...current, "Next Contact · Newest to Oldest"],
-                      )
-                    }
-                    className="cursor-pointer font-medium text-[var(--zb-grid-muted)] transition-colors hover:text-[var(--zb-grid-ink)]"
-                  >
-                    + Add Sort
-                  </button>
-                  <button
-                    type="button"
-                    className="cursor-pointer text-[var(--zb-grid-muted)] transition-colors hover:text-[var(--zb-grid-ink)]"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              </div>
+                {simplePickerOpen ? (
+                  <div className="rounded-lg border border-[var(--zb-grid-rule)] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="text-sm font-semibold">Add Simple Filter</span>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraftSimpleConditions([...committedSimpleConditions]);
+                            setSimplePickerOpen(false);
+                            setActiveSimpleConditionId(null);
+                          }}
+                          className="cursor-pointer rounded-md px-3 py-1.5 text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-sunk)]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!activeSimpleConditionId}
+                          onClick={applySimpleConditions}
+                          className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                    <FilterFieldPicker
+                      label="Simple filter fields"
+                      selectedField={
+                        draftSimpleConditions.find(
+                          (condition) => condition.id === activeSimpleConditionId,
+                        )?.field ?? null
+                      }
+                      usage={filterUsage}
+                      onSelect={selectSimpleField}
+                    />
+                    {activeSimpleConditionId ? (
+                      <p className="mt-2 text-xs text-[var(--zb-grid-muted)]">
+                        {
+                          FILTER_FIELDS.find(
+                            (field) =>
+                              field.key ===
+                              draftSimpleConditions.find(
+                                (condition) => condition.id === activeSimpleConditionId,
+                              )?.field,
+                          )?.label
+                        }{" "}
+                        is selected for this Simple condition.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {advancedEditorOpen ? (
+                  <div className="rounded-lg border border-[var(--zb-grid-rule)] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="text-sm font-semibold">Advanced Filter</span>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraftAdvancedConditions([...committedAdvancedConditions]);
+                            setAdvancedPickerConditionId(null);
+                            setAdvancedEditorOpen(false);
+                          }}
+                          className="cursor-pointer rounded-md px-3 py-1.5 text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-sunk)]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={applyAdvancedConditions}
+                          className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2">
+                      {draftAdvancedConditions.map((condition, index) => {
+                        const field = FILTER_FIELDS.find((item) => item.key === condition.field);
+
+                        return (
+                          <div
+                            key={condition.id}
+                            className="flex flex-wrap items-center gap-3 rounded-md bg-[var(--zb-grid-sunk)] p-3"
+                          >
+                            <span className="text-xs text-[var(--zb-grid-muted)]">
+                              Condition {index + 1}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Change field for condition ${index + 1}: ${field?.label ?? condition.field}`}
+                              aria-pressed={advancedPickerConditionId === condition.id}
+                              onClick={() => openAdvancedFieldPicker(condition.id)}
+                              className="min-w-0 flex-1 rounded-md border border-[var(--zb-grid-rule)] bg-paper px-3 py-2 text-left text-sm text-ink hover:opacity-80"
+                            >
+                              <span className="break-words">{field?.label ?? condition.field}</span>
+                              <span className="ml-2 text-xs text-[var(--zb-grid-muted)]">
+                                Change field
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = `advanced-new-${draftAdvancedConditions.length + 1}`;
+                        setDraftAdvancedConditions((current) => [
+                          ...current,
+                          { id, field: "program" },
+                        ]);
+                        setAdvancedPickerConditionId(id);
+                      }}
+                      className="mt-3 cursor-pointer text-sm font-medium text-[var(--zb-grid-muted)] hover:text-[var(--zb-grid-ink)]"
+                    >
+                      + Add condition
+                    </button>
+
+                    {advancedPickerConditionId ? (
+                      <div className="mt-4 rounded-md border border-[var(--zb-grid-rule)] p-3">
+                        <p className="text-sm font-medium">Select field for condition</p>
+                        <FilterFieldPicker
+                          label="Advanced filter fields"
+                          selectedField={
+                            draftAdvancedConditions.find(
+                              (condition) => condition.id === advancedPickerConditionId,
+                            )?.field ?? null
+                          }
+                          usage={filterUsage}
+                          onSelect={selectAdvancedField}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {riskScreenEditorOpen ? (
+                  <div className="rounded-lg border border-[var(--zb-grid-rule)] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="text-sm font-semibold">Simple Filter</span>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraftRiskScreenValue(committedRiskScreenValue);
+                            setRiskScreenEditorOpen(false);
+                          }}
+                          className="cursor-pointer rounded-md px-3 py-1.5 text-[var(--zb-grid-muted)] transition-colors hover:bg-[var(--zb-grid-sunk)]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!draftRiskScreenValue}
+                          onClick={handleApplyRiskScreenFilter}
+                          className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold transition-colors hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Field</span>
+                        <input
+                          aria-label="Filter field"
+                          value="Risk Screen"
+                          readOnly
+                          className="rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-2"
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Operator</span>
+                        <input
+                          aria-label="Filter operator"
+                          value="is"
+                          readOnly
+                          className="rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-2"
+                        />
+                      </label>
+
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Value</span>
+                        <select
+                          ref={riskScreenValueRef}
+                          aria-label="Risk Screen value"
+                          value={draftRiskScreenValue ?? ""}
+                          onChange={(event) => setDraftRiskScreenValue(event.target.value || null)}
+                          className="rounded-md border border-[var(--zb-grid-rule)] bg-paper px-3 py-2 text-ink"
+                        >
+                          <option value="">Select a value</option>
+                          {[
+                            "Ideation with plan",
+                            "Ideation, no plan",
+                            "Passive ideation",
+                            "None reported",
+                          ].map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <p className="mt-2 text-xs text-[var(--zb-grid-muted)]">
+                      Choose a Risk Screen value before applying this filter.
+                    </p>
+                  </div>
+                ) : null}
+                {groupEditorOpen ? (
+                  <div className="rounded-lg border border-[var(--zb-grid-rule)] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <span className="text-sm font-semibold">Group Editor</span>
+                      <div className="flex gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={handleCancelGroupEditor}
+                          className="cursor-pointer rounded-md px-3 py-1.5 text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-sunk)]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleApplyGroup}
+                          className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Field</span>
+                        <select
+                          aria-label="Group field"
+                          value={draftGroup?.key ?? ""}
+                          onChange={(event) =>
+                            setDraftGroup(
+                              event.target.value
+                                ? {
+                                    key: event.target.value,
+                                    direction: draftGroup?.direction ?? "ascending",
+                                  }
+                                : null,
+                            )
+                          }
+                          className="rounded-md border border-[var(--zb-grid-rule)] bg-paper px-3 py-2 text-ink"
+                        >
+                          <option value="">No grouping</option>
+                          <option value="cssrs">Risk Screen</option>
+                          <option value="program">Program</option>
+                        </select>
+                      </label>
+
+                      <label className="grid gap-1 text-xs">
+                        <span className="font-medium">Direction</span>
+                        <select
+                          aria-label="Group direction"
+                          value={draftGroup?.direction ?? "ascending"}
+                          disabled={!draftGroup}
+                          onChange={(event) =>
+                            setDraftGroup((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    direction: event.target.value as DataGridGroup["direction"],
+                                  }
+                                : current,
+                            )
+                          }
+                          className="rounded-md border border-[var(--zb-grid-rule)] bg-paper px-3 py-2 text-ink disabled:opacity-50"
+                        >
+                          <option value="ascending">A to Z</option>
+                          <option value="descending">Z to A</option>
+                        </select>
+                      </label>
+                    </div>
+                    <p className="mt-2 text-xs text-[var(--zb-grid-muted)]">
+                      Grouping changes the committed criterion. The row hierarchy is not part of
+                      this preview.
+                    </p>
+                  </div>
+                ) : null}
+              </>
             ) : null
           }
           criteria={
             criteriaVisible ? (
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setViewConfig((current) => ({
-                      ...current,
-                      groupBy:
-                        current.groupBy === savedBaseline.groupBy
-                          ? "Priority"
-                          : savedBaseline.groupBy,
-                    }))
-                  }
-                  className="cursor-pointer rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2"
-                >
-                  Group by: {viewConfig.groupBy}
-                </button>
+                {group ? (
+                  <button
+                    type="button"
+                    title={`Grouped by ${getGroupFieldLabel(group.key)}, ${getGroupDirectionLabel(group.direction)}. Activate to edit grouping.`}
+                    aria-label={`Grouped by ${getGroupFieldLabel(group.key)}, ${getGroupDirectionLabel(group.direction)}. Activate to edit grouping.`}
+                    onClick={handleOpenGroupEditor}
+                    className="cursor-pointer rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2 hover:opacity-80"
+                  >
+                    Group by: {getGroupFieldLabel(group.key)}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() =>
@@ -1395,15 +2368,42 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                 >
                   Columns: {viewConfig.columns}
                 </button>
+                <button
+                  type="button"
+                  onClick={handleOpenEditor}
+                  aria-label={`Edit Sort criteria. ${committedSort.length} ${
+                    committedSort.length === 1 ? "field" : "fields"
+                  } currently applied.`}
+                  className={`cursor-pointer rounded-md px-3 py-2 transition-colors ${
+                    editorOpen
+                      ? "border border-[var(--zb-grid-accent)] bg-[var(--zb-grid-sunk)] font-semibold"
+                      : "bg-[var(--zb-grid-sunk)] hover:opacity-80"
+                  }`}
+                >
+                  Sort: {committedSort.length} {committedSort.length === 1 ? "field" : "fields"}
+                </button>
+                <button
+                  type="button"
+                  onClick={openAdvancedEditor}
+                  className="cursor-pointer rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2 hover:opacity-80"
+                >
+                  Advanced filter: {committedAdvancedConditions.length} rules
+                </button>
+                <button
+                  type="button"
+                  onClick={openSimpleFieldPicker}
+                  className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-2 font-semibold hover:opacity-80"
+                >
+                  Add Filter
+                </button>
                 <span className="rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2">
-                  Sort: {committedSort.length} field{committedSort.length === 1 ? "" : "s"}
+                  Status: Archived
                 </span>
-                <span className="rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2">
-                  Advanced filter: 3 rules
-                </span>
-                <span className="rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2">
-                  Status: Active
-                </span>
+                {committedRiskScreenValue && (
+                  <span className="rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2">
+                    Risk Screen: {committedRiskScreenValue}
+                  </span>
+                )}
               </div>
             ) : null
           }
@@ -1411,10 +2411,48 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
           maxHeight={isFullScreen ? "calc(100dvh - 16rem)" : "20rem"}
           identify={identify}
           sort={sort}
-          onSortChange={(next) => {
-            setSort(next);
-            onSortChange?.(next);
+          group={group}
+          onGroupChange={handleCommitGroup}
+          onFilterColumn={handleOpenRiskScreenFilter}
+          columnPinning={columnPinning}
+          onColumnPinningChange={setColumnPinning}
+          onHideColumn={(columnKey) => {
+            setHiddenColumns((current) =>
+              current.includes(columnKey) ? current : [...current, columnKey],
+            );
           }}
+          sortRanks={sortRules}
+          onClearSort={(columnKey) => {
+            const nextCommittedSort = committedSort.filter((label) => {
+              switch (label) {
+                case "Name · A to Z":
+                case "Name · Z to A":
+                  return columnKey !== "name";
+                case "PHQ-9 · High to Low":
+                case "PHQ-9 · Low to High":
+                  return columnKey !== "phq9";
+                case "Risk Screen · Declared order":
+                case "Risk Screen · Reverse declared order":
+                  return columnKey !== "cssrs";
+                case "Priority · High to Low":
+                case "Priority · Low to High":
+                  return columnKey !== "risk";
+                case "Next Contact · Soonest first":
+                case "Next Contact · Newest to Oldest":
+                  return columnKey !== "due";
+                default:
+                  return true;
+              }
+            });
+
+            setCommittedSort(nextCommittedSort);
+            setSort(getPrimarySort(nextCommittedSort));
+            setViewConfig((current) => ({
+              ...current,
+              sort: nextCommittedSort,
+            }));
+          }}
+          onSortChange={handleHeaderSortChange}
           selectedKeys={selected}
           onSelectionChange={(keys) => {
             setSelected(keys);
@@ -1435,6 +2473,14 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
           exhausted
           {...rest}
         />
+
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {groupAnnouncement}
+        </div>
+
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {sortAnnouncement}
+        </div>
       </div>
 
       {pendingExit && (
@@ -1471,15 +2517,17 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
             </h2>
 
             <p id="discard-dialog-description" className="mt-2 text-sm text-[var(--zb-grid-muted)]">
-              {pendingExit === "view"
-                ? `Switching to ${pendingView ?? "another"} view will discard ${
-                    draftModified && viewModified
-                      ? "your unsaved Sort changes and view settings"
-                      : draftModified
-                        ? "your unsaved Sort changes"
-                        : "your unsaved view settings"
-                  }. Do you want to continue?`
-                : "You have unsaved Sort changes. Do you want to discard them?"}
+              {pendingExit === "sort"
+                ? `Applying ${pendingSortAction?.label ?? "the selected Sort"} will discard your unsaved Sort changes. Do you want to continue?`
+                : pendingExit === "view"
+                  ? `Switching to ${pendingView ?? "another"} view will discard ${
+                      draftModified && viewModified
+                        ? "your unsaved Sort changes and view settings"
+                        : draftModified
+                          ? "your unsaved Sort changes"
+                          : "your unsaved view settings"
+                    }. Do you want to continue?`
+                  : "You have unsaved Sort changes. Do you want to discard them?"}
             </p>
 
             <div className="mt-5 flex justify-end gap-2">
