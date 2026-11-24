@@ -1356,609 +1356,639 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
           }
 
           toolbar={
-            <div className="flex w-full flex-nowrap items-center justify-between gap-3">
-              {/* Saved views */}
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  ref={(node) => {
-                    viewButtonRefs.current.Overview = node;
-                  }}
-                  className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs font-semibold ${
-                    selectedView === "Overview"
-                      ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)]"
-                      : "border-[var(--zb-grid-rule)] text-[var(--zb-grid-muted)]"
-                  }`}
-                  aria-pressed={selectedView === "Overview"}
-                  onClick={() => handleSelectView("Overview")}
+            <div
+              className={
+                isFullScreen
+                  ? "flex w-full flex-nowrap items-center justify-between gap-3"
+                  : "w-full min-w-0 overflow-x-auto"
+              }
+            >
+              <div
+                className={
+                  isFullScreen
+                    ? "contents"
+                    : "flex w-max min-w-full flex-nowrap items-center justify-between gap-3"
+                }
+              >
+                {/* Saved views */}
+                <div
+                  className={
+                    isFullScreen
+                      ? "flex flex-wrap items-center gap-3"
+                      : "flex shrink-0 flex-nowrap items-center gap-3"
+                  }
                 >
-                  Overview
-                </button>
-                <button
-                  type="button"
-                  ref={(node) => {
-                    viewButtonRefs.current.Patients = node;
-                  }}
-                  className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs ${
-                    selectedView === "Patients"
-                      ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] font-semibold"
-                      : "border-[var(--zb-grid-rule)] text-[var(--zb-grid-muted)]"
-                  }`}
-                  aria-pressed={selectedView === "Patients"}
-                  onClick={() => handleSelectView("Patients")}
+                  <button
+                    type="button"
+                    ref={(node) => {
+                      viewButtonRefs.current.Overview = node;
+                    }}
+                    className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs font-semibold ${
+                      selectedView === "Overview"
+                        ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)]"
+                        : "border-[var(--zb-grid-rule)] text-[var(--zb-grid-muted)]"
+                    }`}
+                    aria-pressed={selectedView === "Overview"}
+                    onClick={() => handleSelectView("Overview")}
+                  >
+                    Overview
+                  </button>
+                  <button
+                    type="button"
+                    ref={(node) => {
+                      viewButtonRefs.current.Patients = node;
+                    }}
+                    className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs ${
+                      selectedView === "Patients"
+                        ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] font-semibold"
+                        : "border-[var(--zb-grid-rule)] text-[var(--zb-grid-muted)]"
+                    }`}
+                    aria-pressed={selectedView === "Patients"}
+                    onClick={() => handleSelectView("Patients")}
+                  >
+                    Patients
+                  </button>
+                  <button
+                    type="button"
+                    ref={(node) => {
+                      viewButtonRefs.current.Appointments = node;
+                    }}
+                    className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs ${
+                      selectedView === "Appointments"
+                        ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] font-semibold"
+                        : "border-[var(--zb-grid-rule)] text-[var(--zb-grid-muted)]"
+                    }`}
+                    aria-pressed={selectedView === "Appointments"}
+                    onClick={() => handleSelectView("Appointments")}
+                  >
+                    Appointments
+                  </button>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 cursor-pointer rounded-2xl border border-[var(--zb-grid-rule)] px-2 py-2 text-xs text-[var(--zb-grid-muted)]"
+                  >
+                    <Ellipsis size={16} />
+                    More
+                  </button>
+                </div>
+
+                {viewAnnouncement && (
+                  <span className="sr-only" role="status" aria-live="polite">
+                    {viewAnnouncement}
+                  </span>
+                )}
+
+                {/* Actions and view controls */}
+                <div
+                  className={
+                    isFullScreen
+                      ? "group flex min-w-0 max-w-full flex-nowrap items-center justify-start gap-3 overflow-x-auto [&>*]:shrink-0 sm:flex-wrap sm:justify-end sm:overflow-visible"
+                      : "group flex shrink-0 flex-nowrap items-center justify-start gap-3 [&>*]:shrink-0"
+                  }
                 >
-                  Patients
-                </button>
-                <button
-                  type="button"
-                  ref={(node) => {
-                    viewButtonRefs.current.Appointments = node;
-                  }}
-                  className={`cursor-pointer rounded-2xl border px-3 py-2 text-xs ${
-                    selectedView === "Appointments"
-                      ? "border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] font-semibold"
-                      : "border-[var(--zb-grid-rule)] text-[var(--zb-grid-muted)]"
-                  }`}
-                  aria-pressed={selectedView === "Appointments"}
-                  onClick={() => handleSelectView("Appointments")}
-                >
-                  Appointments
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-1 cursor-pointer rounded-2xl border border-[var(--zb-grid-rule)] px-2 py-2 text-xs text-[var(--zb-grid-muted)]"
-                >
-                  <Ellipsis size={16} />
-                  More
-                </button>
-              </div>
+                  {/* Collapse/Expand toolbar */}
+                  <button
+                    type="button"
+                    aria-label={toolbarExpanded ? "Collapse toolbar" : "Expand toolbar"}
+                    title={toolbarExpanded ? "Collapse toolbar" : "Expand toolbar"}
+                    onClick={() => setToolbarExpanded((expanded) => !expanded)}
+                    className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)] p-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--zb-grid-ink)]"
+                  >
+                    {toolbarExpanded ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
+                  </button>
 
-              {viewAnnouncement && (
-                <span className="sr-only" role="status" aria-live="polite">
-                  {viewAnnouncement}
-                </span>
-              )}
+                  {/* Separator after Collapse/Expand */}
+                  <span aria-hidden="true" className="h-6 border-l border-[var(--zb-grid-rule)]" />
 
-              {/* Actions and view controls */}
-              <div className="group flex min-w-0 max-w-full flex-nowrap items-center justify-start gap-3 overflow-x-auto [&>*]:shrink-0 sm:flex-wrap sm:justify-end sm:overflow-visible">
-                {/* Collapse/Expand toolbar */}
-                <button
-                  type="button"
-                  aria-label={toolbarExpanded ? "Collapse toolbar" : "Expand toolbar"}
-                  title={toolbarExpanded ? "Collapse toolbar" : "Expand toolbar"}
-                  onClick={() => setToolbarExpanded((expanded) => !expanded)}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)] p-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--zb-grid-ink)]"
-                >
-                  {toolbarExpanded ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
-                </button>
-
-                {/* Separator after Collapse/Expand */}
-                <span aria-hidden="true" className="h-6 border-l border-[var(--zb-grid-rule)]" />
-
-                {toolbarExpanded && (
-                  <>
-                    {viewModified && (
-                      <div className="relative inline-flex items-center">
-                        <button
-                          type="button"
-                          onClick={handleSaveView}
-                          disabled={isProtectedView}
-                          className="cursor-pointer rounded-l-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Save Changes
-                        </button>
-
-                        <button
-                          type="button"
-                          aria-label="More save options"
-                          aria-expanded={saveMenuOpen}
-                          title="More save options"
-                          onClick={() => setSaveMenuOpen((open) => !open)}
-                          className="cursor-pointer rounded-r-md border border-l-0 border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] p-2"
-                        >
-                          <ChevronDown size={14} aria-hidden="true" />
-                        </button>
-                        {saveMenuOpen && (
-                          <div
-                            role="menu"
-                            className="absolute right-0 top-full z-20 mt-1 min-w-40 rounded-md border border-[var(--zb-grid-rule)] bg-paper p-1 shadow-lg"
+                  {toolbarExpanded && (
+                    <>
+                      {viewModified && (
+                        <div className="relative inline-flex items-center">
+                          <button
+                            type="button"
+                            onClick={handleSaveView}
+                            disabled={isProtectedView}
+                            className="cursor-pointer rounded-l-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            <button
-                              type="button"
-                              role="menuitem"
-                              onClick={handleRevertView}
-                              className="w-full cursor-pointer rounded px-3 py-2 text-left text-xs text-ink transition-colors hover:bg-[var(--zb-grid-sunk)]"
+                            Save Changes
+                          </button>
+
+                          <button
+                            type="button"
+                            aria-label="More save options"
+                            aria-expanded={saveMenuOpen}
+                            title="More save options"
+                            onClick={() => setSaveMenuOpen((open) => !open)}
+                            className="cursor-pointer rounded-r-md border border-l-0 border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] p-2"
+                          >
+                            <ChevronDown size={14} aria-hidden="true" />
+                          </button>
+                          {saveMenuOpen && (
+                            <div
+                              role="menu"
+                              className="absolute right-0 top-full z-20 mt-1 min-w-40 rounded-md border border-[var(--zb-grid-rule)] bg-paper p-1 shadow-lg"
                             >
-                              Revert changes
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Filter */}
-                    <button
-                      type="button"
-                      aria-label="Filter"
-                      title="Toggle filter"
-                      onClick={() =>
-                        setViewConfig((current) => ({
-                          ...current,
-                          filter:
-                            current.filter === savedBaseline.filter
-                              ? "Changed filter"
-                              : savedBaseline.filter,
-                        }))
-                      }
-                      className={`cursor-pointer rounded-md border p-2 ${
-                        viewConfig.filter !== savedBaseline.filter
-                          ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)]"
-                          : "border-[var(--zb-grid-rule)]"
-                      }`}
-                    >
-                      <Filter size={16} />
-                    </button>
-
-                    {/* Sort */}
-                    <button
-                      ref={sortButtonRef}
-                      type="button"
-                      aria-label="Sort"
-                      title="Sort"
-                      onClick={handleOpenEditor}
-                      className={`cursor-pointer rounded-md border p-2 transition-colors ${
-                        editorOpen
-                          ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)] text-[var(--zb-grid-ink)]"
-                          : "border-[var(--zb-grid-rule)]"
-                      }`}
-                    >
-                      <ArrowDownUp size={16} />
-                    </button>
-
-                    {/* Manage columns */}
-                    <button
-                      ref={manageColumnsTriggerRef}
-                      type="button"
-                      aria-expanded={manageColumnsOpen}
-                      onClick={() => setManageColumnsOpen(true)}
-                      className={`cursor-pointer rounded-md border px-3 py-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2 ${
-                        manageColumnsOpen
-                          ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)]"
-                          : "border-[var(--zb-grid-rule)]"
-                      }`}
-                    >
-                      Manage columns
-                    </button>
-
-                    {/* Manage columns drawer */}
-                    {manageColumnsOpen && (
-                      <div className="fixed inset-0 z-[100]">
-                        {/* Backdrop */}
-                        <button
-                          type="button"
-                          aria-label="Close manage columns panel"
-                          onClick={() => setManageColumnsOpen(false)}
-                          className="absolute inset-0 bg-black/30"
-                        />
-
-                        {/* Drawer */}
-                        <aside
-                          ref={manageColumnsDrawerRef}
-                          role="dialog"
-                          onKeyDown={(event) => {
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              setManageColumnsOpen(false);
-                              return;
-                            }
-
-                            if (event.key !== "Tab") return;
-
-                            const focusableElements =
-                              event.currentTarget.querySelectorAll<HTMLElement>(
-                                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-                              );
-
-                            const firstElement = focusableElements[0];
-                            const lastElement = focusableElements[focusableElements.length - 1];
-
-                            if (!firstElement || !lastElement) {
-                              event.preventDefault();
-                              return;
-                            }
-
-                            if (event.shiftKey && document.activeElement === firstElement) {
-                              event.preventDefault();
-                              lastElement.focus();
-                            } else if (!event.shiftKey && document.activeElement === lastElement) {
-                              event.preventDefault();
-                              firstElement.focus();
-                            }
-                          }}
-                          aria-modal="true"
-                          aria-labelledby="manage-columns-title"
-                          className="absolute inset-y-0 right-0 flex w-full max-w-sm flex-col border-l border-[var(--zb-grid-rule)] bg-paper shadow-2xl"
-                        >
-                          {/* Header */}
-                          <div className="flex items-center justify-between border-b border-[var(--zb-grid-rule)] px-5 py-4">
-                            <div>
-                              <h2
-                                id="manage-columns-title"
-                                className="text-sm font-semibold text-ink"
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={handleRevertView}
+                                className="w-full cursor-pointer rounded px-3 py-2 text-left text-xs text-ink transition-colors hover:bg-[var(--zb-grid-sunk)]"
                               >
-                                Manage columns
-                              </h2>
-                              <p className="mt-1 text-xs text-[var(--zb-grid-muted)]">
-                                Choose which columns appear in the grid.
-                              </p>
+                                Revert changes
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Filter */}
+                      <button
+                        type="button"
+                        aria-label="Filter"
+                        title="Toggle filter"
+                        onClick={() =>
+                          setViewConfig((current) => ({
+                            ...current,
+                            filter:
+                              current.filter === savedBaseline.filter
+                                ? "Changed filter"
+                                : savedBaseline.filter,
+                          }))
+                        }
+                        className={`cursor-pointer rounded-md border p-2 ${
+                          viewConfig.filter !== savedBaseline.filter
+                            ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)]"
+                            : "border-[var(--zb-grid-rule)]"
+                        }`}
+                      >
+                        <Filter size={16} />
+                      </button>
+
+                      {/* Sort */}
+                      <button
+                        ref={sortButtonRef}
+                        type="button"
+                        aria-label="Sort"
+                        title="Sort"
+                        onClick={handleOpenEditor}
+                        className={`cursor-pointer rounded-md border p-2 transition-colors ${
+                          editorOpen
+                            ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)] text-[var(--zb-grid-ink)]"
+                            : "border-[var(--zb-grid-rule)]"
+                        }`}
+                      >
+                        <ArrowDownUp size={16} />
+                      </button>
+
+                      {/* Manage columns */}
+                      <button
+                        ref={manageColumnsTriggerRef}
+                        type="button"
+                        aria-expanded={manageColumnsOpen}
+                        onClick={() => setManageColumnsOpen(true)}
+                        className={`cursor-pointer rounded-md border px-3 py-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2 ${
+                          manageColumnsOpen
+                            ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)]"
+                            : "border-[var(--zb-grid-rule)]"
+                        }`}
+                      >
+                        Manage columns
+                      </button>
+
+                      {/* Manage columns drawer */}
+                      {manageColumnsOpen && (
+                        <div className="fixed inset-0 z-[100]">
+                          {/* Backdrop */}
+                          <button
+                            type="button"
+                            aria-label="Close manage columns panel"
+                            onClick={() => setManageColumnsOpen(false)}
+                            className="absolute inset-0 bg-black/30"
+                          />
+
+                          {/* Drawer */}
+                          <aside
+                            ref={manageColumnsDrawerRef}
+                            role="dialog"
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setManageColumnsOpen(false);
+                                return;
+                              }
+
+                              if (event.key !== "Tab") return;
+
+                              const focusableElements =
+                                event.currentTarget.querySelectorAll<HTMLElement>(
+                                  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+                                );
+
+                              const firstElement = focusableElements[0];
+                              const lastElement = focusableElements[focusableElements.length - 1];
+
+                              if (!firstElement || !lastElement) {
+                                event.preventDefault();
+                                return;
+                              }
+
+                              if (event.shiftKey && document.activeElement === firstElement) {
+                                event.preventDefault();
+                                lastElement.focus();
+                              } else if (
+                                !event.shiftKey &&
+                                document.activeElement === lastElement
+                              ) {
+                                event.preventDefault();
+                                firstElement.focus();
+                              }
+                            }}
+                            aria-modal="true"
+                            aria-labelledby="manage-columns-title"
+                            className="absolute inset-y-0 right-0 flex w-full max-w-sm flex-col border-l border-[var(--zb-grid-rule)] bg-paper shadow-2xl"
+                          >
+                            {/* Header */}
+                            <div className="flex items-center justify-between border-b border-[var(--zb-grid-rule)] px-5 py-4">
+                              <div>
+                                <h2
+                                  id="manage-columns-title"
+                                  className="text-sm font-semibold text-ink"
+                                >
+                                  Manage columns
+                                </h2>
+                                <p className="mt-1 text-xs text-[var(--zb-grid-muted)]">
+                                  Choose which columns appear in the grid.
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                aria-label="Close"
+                                onClick={() => setManageColumnsOpen(false)}
+                                className="rounded-md p-2 text-[var(--zb-grid-muted)] outline-none transition-colors hover:bg-[var(--zb-grid-sunk)] hover:text-ink focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
+                              >
+                                <X size={18} />
+                              </button>
                             </div>
 
-                            <button
-                              type="button"
-                              aria-label="Close"
-                              onClick={() => setManageColumnsOpen(false)}
-                              className="rounded-md p-2 text-[var(--zb-grid-muted)] outline-none transition-colors hover:bg-[var(--zb-grid-sunk)] hover:text-ink focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
-                            >
-                              <X size={18} />
-                            </button>
-                          </div>
-
-                          {/* Search columns */}
-                          <div className="border-b border-[var(--zb-grid-rule)] px-5 py-3">
-                            <div className="relative">
-                              <Search
-                                size={16}
-                                aria-hidden="true"
-                                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--zb-grid-muted)]"
-                              />
-                              <input
-                                ref={manageColumnsSearchRef}
-                                type="text"
-                                value={columnSearch}
-                                onChange={(event) => setColumnSearch(event.target.value)}
-                                placeholder="Search columns..."
-                                aria-label="Search columns"
-                                className="h-9 w-full rounded-md border border-[var(--zb-grid-rule)] bg-paper pl-9 pr-3 text-xs text-ink outline-none placeholder:text-[var(--zb-grid-muted)] focus-visible:border-[var(--zb-grid-ink)] focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]/20"
-                              />
+                            {/* Search columns */}
+                            <div className="border-b border-[var(--zb-grid-rule)] px-5 py-3">
+                              <div className="relative">
+                                <Search
+                                  size={16}
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--zb-grid-muted)]"
+                                />
+                                <input
+                                  ref={manageColumnsSearchRef}
+                                  type="text"
+                                  value={columnSearch}
+                                  onChange={(event) => setColumnSearch(event.target.value)}
+                                  placeholder="Search columns..."
+                                  aria-label="Search columns"
+                                  className="h-9 w-full rounded-md border border-[var(--zb-grid-rule)] bg-paper pl-9 pr-3 text-xs text-ink outline-none placeholder:text-[var(--zb-grid-muted)] focus-visible:border-[var(--zb-grid-ink)] focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]/20"
+                                />
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Column lists */}
-                          <div className="flex-1 space-y-6 overflow-y-auto p-5">
-                            {(() => {
-                              const columns =
-                                selectedView === "Patients"
-                                  ? CASELOAD_COLUMNS_DOC
-                                  : CASELOAD_COLUMNS_WIDE;
-
-                              const searchTerm = columnSearch.trim().toLowerCase();
-
-                              const visibleColumns = columns.filter(
-                                (column) =>
-                                  !hiddenColumns.includes(column.key) &&
-                                  column.header.toLowerCase().includes(searchTerm),
-                              );
-
-                              const hidden = columns.filter(
-                                (column) =>
-                                  hiddenColumns.includes(column.key) &&
-                                  column.header.toLowerCase().includes(searchTerm),
-                              );
-
-                              return (
-                                <>
-                                  {/* Visible columns */}
-                                  <section>
-                                    <div className="mb-3 flex items-center justify-between">
-                                      <h3 className="text-xs font-semibold text-ink">
-                                        Visible columns
-                                      </h3>
-                                      <span className="text-xs text-[var(--zb-grid-muted)]">
-                                        {visibleColumns.length}
-                                      </span>
-                                    </div>
-
-                                    {visibleColumns.length > 0 ? (
-                                      <div className="flex flex-col gap-3">
-                                        {visibleColumns.map((column) => (
-                                          <label
-                                            key={column.key}
-                                            className="flex cursor-pointer items-center gap-3 text-xs text-ink"
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked
-                                              onChange={() =>
-                                                setHiddenColumns((current) => [
-                                                  ...current,
-                                                  column.key,
-                                                ])
-                                              }
-                                              className="accent-[var(--zb-grid-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
-                                            />
-                                            <span>{column.header}</span>
-                                          </label>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="text-xs text-[var(--zb-grid-muted)]">
-                                        {columnSearch.trim()
-                                          ? "No matching visible columns."
-                                          : "No visible columns."}
-                                      </p>
-                                    )}
-                                  </section>
-
-                                  <div className="border-t border-[var(--zb-grid-rule)]" />
-
-                                  {/* Hidden columns */}
-                                  <section>
-                                    <div className="mb-3 flex items-center justify-between">
-                                      <h3 className="text-xs font-semibold text-ink">
-                                        Hidden columns
-                                      </h3>
-                                      <span className="text-xs text-[var(--zb-grid-muted)]">
-                                        {hidden.length}
-                                      </span>
-                                    </div>
-
-                                    {hidden.length > 0 ? (
-                                      <div className="flex flex-col gap-3">
-                                        {hidden.map((column) => (
-                                          <label
-                                            key={column.key}
-                                            className="flex cursor-pointer items-center gap-3 text-xs text-ink"
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={false}
-                                              onChange={() =>
-                                                setHiddenColumns((current) =>
-                                                  current.filter((key) => key !== column.key),
-                                                )
-                                              }
-                                              className="accent-[var(--zb-grid-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
-                                            />
-                                            <span>{column.header}</span>
-                                          </label>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="text-xs text-[var(--zb-grid-muted)]">
-                                        {columnSearch.trim()
-                                          ? "No matching hidden columns."
-                                          : "No hidden columns."}
-                                      </p>
-                                    )}
-                                  </section>
-                                </>
-                              );
-                            })()}
-                          </div>
-
-                          {/* Footer */}
-                          <div className="flex items-center justify-between border-t border-[var(--zb-grid-rule)] px-5 py-4">
-                            <span className="text-xs text-[var(--zb-grid-muted)]">
+                            {/* Column lists */}
+                            <div className="flex-1 space-y-6 overflow-y-auto p-5">
                               {(() => {
                                 const columns =
                                   selectedView === "Patients"
                                     ? CASELOAD_COLUMNS_DOC
                                     : CASELOAD_COLUMNS_WIDE;
 
-                                return columns.filter((column) =>
-                                  hiddenColumns.includes(column.key),
-                                ).length;
-                              })()}{" "}
-                              columns hidden
-                            </span>
+                                const searchTerm = columnSearch.trim().toLowerCase();
 
-                            <button
-                              type="button"
-                              disabled={hiddenColumns.length === 0}
-                              onClick={() => setHiddenColumns([])}
-                              className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] px-3 py-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              Restore all
-                            </button>
-                          </div>
-                        </aside>
-                      </div>
-                    )}
-                  </>
-                )}
+                                const visibleColumns = columns.filter(
+                                  (column) =>
+                                    !hiddenColumns.includes(column.key) &&
+                                    column.header.toLowerCase().includes(searchTerm),
+                                );
 
-                {/* Search remains visible in both states */}
-                {searchOpen ? (
-                  <div
-                    ref={searchContainerRef}
-                    className="group relative flex h-8 w-56 items-center"
-                  >
-                    <Search
-                      size={16}
-                      aria-hidden="true"
-                      className="pointer-events-none absolute left-2 text-[var(--zb-grid-muted)]"
-                    />
-                    <label htmlFor="data-grid-search-input" className="sr-only">
-                      Search records
-                    </label>
-                    <input
-                      ref={searchInputRef}
-                      id="data-grid-search-input"
-                      type="text"
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      placeholder="Search records..."
-                      className="h-8 w-full rounded-md border border-[var(--zb-grid-rule)] bg-paper pl-8 pr-16 text-xs text-ink outline-none focus-visible:border-[var(--zb-grid-ink)] focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]/20"
-                    />
-                    {showSearchSettings && (
-                      <>
-                        <button
-                          ref={searchSettingsTriggerRef}
-                          type="button"
-                          aria-label="Search settings"
-                          aria-expanded={searchSettingsOpen}
-                          aria-controls="data-grid-search-settings"
-                          title="Search settings"
-                          onClick={() => setSearchSettingsOpen((open) => !open)}
-                          className="absolute right-9 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--zb-grid-muted)] opacity-0 transition-opacity hover:bg-[var(--zb-grid-rule)] group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
-                        >
-                          <Ellipsis size={14} aria-hidden="true" />
-                        </button>
+                                const hidden = columns.filter(
+                                  (column) =>
+                                    hiddenColumns.includes(column.key) &&
+                                    column.header.toLowerCase().includes(searchTerm),
+                                );
 
-                        {searchSettingsOpen && (
-                          <div
-                            id="data-grid-search-settings"
-                            className="absolute right-0 top-full z-30 mt-2 w-60 rounded-md border border-[var(--zb-grid-rule)] bg-paper p-3 shadow-lg"
-                          >
-                            <fieldset className="m-0 min-w-0 border-0 p-0">
-                              <legend className="mb-2 text-xs font-semibold text-ink">
-                                Search in
-                              </legend>
+                                return (
+                                  <>
+                                    {/* Visible columns */}
+                                    <section>
+                                      <div className="mb-3 flex items-center justify-between">
+                                        <h3 className="text-xs font-semibold text-ink">
+                                          Visible columns
+                                        </h3>
+                                        <span className="text-xs text-[var(--zb-grid-muted)]">
+                                          {visibleColumns.length}
+                                        </span>
+                                      </div>
 
-                              <div className="flex flex-col gap-2">
-                                {selectableSearchFields.map((field) => {
-                                  const eligibleSelectedCount = searchScope!.selected.filter(
-                                    (key) =>
-                                      searchScope!.fields.some(
-                                        (candidate) => candidate.key === key && !candidate.disabled,
-                                      ),
+                                      {visibleColumns.length > 0 ? (
+                                        <div className="flex flex-col gap-3">
+                                          {visibleColumns.map((column) => (
+                                            <label
+                                              key={column.key}
+                                              className="flex cursor-pointer items-center gap-3 text-xs text-ink"
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked
+                                                onChange={() =>
+                                                  setHiddenColumns((current) => [
+                                                    ...current,
+                                                    column.key,
+                                                  ])
+                                                }
+                                                className="accent-[var(--zb-grid-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
+                                              />
+                                              <span>{column.header}</span>
+                                            </label>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-[var(--zb-grid-muted)]">
+                                          {columnSearch.trim()
+                                            ? "No matching visible columns."
+                                            : "No visible columns."}
+                                        </p>
+                                      )}
+                                    </section>
+
+                                    <div className="border-t border-[var(--zb-grid-rule)]" />
+
+                                    {/* Hidden columns */}
+                                    <section>
+                                      <div className="mb-3 flex items-center justify-between">
+                                        <h3 className="text-xs font-semibold text-ink">
+                                          Hidden columns
+                                        </h3>
+                                        <span className="text-xs text-[var(--zb-grid-muted)]">
+                                          {hidden.length}
+                                        </span>
+                                      </div>
+
+                                      {hidden.length > 0 ? (
+                                        <div className="flex flex-col gap-3">
+                                          {hidden.map((column) => (
+                                            <label
+                                              key={column.key}
+                                              className="flex cursor-pointer items-center gap-3 text-xs text-ink"
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={false}
+                                                onChange={() =>
+                                                  setHiddenColumns((current) =>
+                                                    current.filter((key) => key !== column.key),
+                                                  )
+                                                }
+                                                className="accent-[var(--zb-grid-ink)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2"
+                                              />
+                                              <span>{column.header}</span>
+                                            </label>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-[var(--zb-grid-muted)]">
+                                          {columnSearch.trim()
+                                            ? "No matching hidden columns."
+                                            : "No hidden columns."}
+                                        </p>
+                                      )}
+                                    </section>
+                                  </>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="flex items-center justify-between border-t border-[var(--zb-grid-rule)] px-5 py-4">
+                              <span className="text-xs text-[var(--zb-grid-muted)]">
+                                {(() => {
+                                  const columns =
+                                    selectedView === "Patients"
+                                      ? CASELOAD_COLUMNS_DOC
+                                      : CASELOAD_COLUMNS_WIDE;
+
+                                  return columns.filter((column) =>
+                                    hiddenColumns.includes(column.key),
                                   ).length;
+                                })()}{" "}
+                                columns hidden
+                              </span>
 
-                                  const preventsEmptySelection =
-                                    searchScope!.zeroSelectedBehavior === "block" &&
-                                    searchScope!.selected.includes(field.key) &&
-                                    eligibleSelectedCount <= 1;
+                              <button
+                                type="button"
+                                disabled={hiddenColumns.length === 0}
+                                onClick={() => setHiddenColumns([])}
+                                className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] px-3 py-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                Restore all
+                              </button>
+                            </div>
+                          </aside>
+                        </div>
+                      )}
+                    </>
+                  )}
 
-                                  return (
-                                    <label
-                                      key={field.key}
-                                      className="flex min-h-7 items-center gap-2 text-xs text-ink"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={searchScope!.selected.includes(field.key)}
-                                        disabled={field.disabled || preventsEmptySelection}
-                                        onChange={(event) =>
-                                          handleSearchScopeToggle(field.key, event.target.checked)
-                                        }
-                                        className="h-3.5 w-3.5 accent-[var(--zb-grid-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
-                                      />
-                                      <span
-                                        className={
-                                          field.disabled ? "text-[var(--zb-grid-muted)]" : ""
-                                        }
+                  {/* Search remains visible in both states */}
+                  {searchOpen ? (
+                    <div
+                      ref={searchContainerRef}
+                      className="group relative flex h-8 w-56 items-center"
+                    >
+                      <Search
+                        size={16}
+                        aria-hidden="true"
+                        className="pointer-events-none absolute left-2 text-[var(--zb-grid-muted)]"
+                      />
+                      <label htmlFor="data-grid-search-input" className="sr-only">
+                        Search records
+                      </label>
+                      <input
+                        ref={searchInputRef}
+                        id="data-grid-search-input"
+                        type="text"
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        placeholder="Search records..."
+                        className="h-8 w-full rounded-md border border-[var(--zb-grid-rule)] bg-paper pl-8 pr-16 text-xs text-ink outline-none focus-visible:border-[var(--zb-grid-ink)] focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]/20"
+                      />
+                      {showSearchSettings && (
+                        <>
+                          <button
+                            ref={searchSettingsTriggerRef}
+                            type="button"
+                            aria-label="Search settings"
+                            aria-expanded={searchSettingsOpen}
+                            aria-controls="data-grid-search-settings"
+                            title="Search settings"
+                            onClick={() => setSearchSettingsOpen((open) => !open)}
+                            className="absolute right-9 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--zb-grid-muted)] opacity-0 transition-opacity hover:bg-[var(--zb-grid-rule)] group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                          >
+                            <Ellipsis size={14} aria-hidden="true" />
+                          </button>
+
+                          {searchSettingsOpen && (
+                            <div
+                              id="data-grid-search-settings"
+                              className="absolute right-0 top-full z-30 mt-2 w-60 rounded-md border border-[var(--zb-grid-rule)] bg-paper p-3 shadow-lg"
+                            >
+                              <fieldset className="m-0 min-w-0 border-0 p-0">
+                                <legend className="mb-2 text-xs font-semibold text-ink">
+                                  Search in
+                                </legend>
+
+                                <div className="flex flex-col gap-2">
+                                  {selectableSearchFields.map((field) => {
+                                    const eligibleSelectedCount = searchScope!.selected.filter(
+                                      (key) =>
+                                        searchScope!.fields.some(
+                                          (candidate) =>
+                                            candidate.key === key && !candidate.disabled,
+                                        ),
+                                    ).length;
+
+                                    const preventsEmptySelection =
+                                      searchScope!.zeroSelectedBehavior === "block" &&
+                                      searchScope!.selected.includes(field.key) &&
+                                      eligibleSelectedCount <= 1;
+
+                                    return (
+                                      <label
+                                        key={field.key}
+                                        className="flex min-h-7 items-center gap-2 text-xs text-ink"
                                       >
-                                        {field.label}
-                                        {field.disabled ? " (unavailable)" : ""}
-                                      </span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            </fieldset>
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {searchQuery.length > 0 && (
+                                        <input
+                                          type="checkbox"
+                                          checked={searchScope!.selected.includes(field.key)}
+                                          disabled={field.disabled || preventsEmptySelection}
+                                          onChange={(event) =>
+                                            handleSearchScopeToggle(field.key, event.target.checked)
+                                          }
+                                          className="h-3.5 w-3.5 accent-[var(--zb-grid-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                                        />
+                                        <span
+                                          className={
+                                            field.disabled ? "text-[var(--zb-grid-muted)]" : ""
+                                          }
+                                        >
+                                          {field.label}
+                                          {field.disabled ? " (unavailable)" : ""}
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </fieldset>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {searchQuery.length > 0 && (
+                        <button
+                          type="button"
+                          aria-label="Clear Search"
+                          title="Clear Search"
+                          onClick={() => {
+                            setSearchQuery("");
+                            searchInputRef.current?.focus();
+                          }}
+                          className="absolute right-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-rule)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                        >
+                          ×
+                        </button>
+                      )}
+
+                      {searchPending ? (
+                        <span role="status" className="sr-only">
+                          Searching records
+                        </span>
+                      ) : searchResultCount !== null ? (
+                        <span role="status" className="sr-only">
+                          {searchResultCount} matching clients found
+                        </span>
+                      ) : null}
+                      <span role="status" aria-live="polite" className="sr-only">
+                        {searchScopeAnnouncement}
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      ref={searchTriggerRef}
+                      type="button"
+                      aria-label="Search"
+                      title="Search"
+                      onClick={() => setSearchOpen(true)}
+                      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)]"
+                    >
+                      <Search size={16} aria-hidden="true" />
+                    </button>
+                  )}
+
+                  {/* Separator after Search in both states */}
+                  <span aria-hidden="true" className="h-6 border-l border-[var(--zb-grid-rule)]" />
+
+                  {toolbarExpanded && (
+                    <>
+                      {/* Full screen */}
                       <button
                         type="button"
-                        aria-label="Clear Search"
-                        title="Clear Search"
-                        onClick={() => {
-                          setSearchQuery("");
-                          searchInputRef.current?.focus();
-                        }}
-                        className="absolute right-2 inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-rule)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--zb-grid-ink)]"
+                        aria-label={isFullScreen ? "Exit full screen" : "Full screen"}
+                        title={isFullScreen ? "Exit full screen" : "Full screen"}
+                        aria-pressed={isFullScreen}
+                        onClick={() => setIsFullScreen((current) => !current)}
+                        className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
                       >
-                        ×
+                        {isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                       </button>
-                    )}
-
-                    {searchPending ? (
-                      <span role="status" className="sr-only">
-                        Searching records
-                      </span>
-                    ) : searchResultCount !== null ? (
-                      <span role="status" className="sr-only">
-                        {searchResultCount} matching clients found
-                      </span>
-                    ) : null}
-                    <span role="status" aria-live="polite" className="sr-only">
-                      {searchScopeAnnouncement}
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    ref={searchTriggerRef}
-                    type="button"
-                    aria-label="Search"
-                    title="Search"
-                    onClick={() => setSearchOpen(true)}
-                    className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)]"
-                  >
-                    <Search size={16} aria-hidden="true" />
-                  </button>
-                )}
-
-                {/* Separator after Search in both states */}
-                <span aria-hidden="true" className="h-6 border-l border-[var(--zb-grid-rule)]" />
-
-                {toolbarExpanded && (
-                  <>
-                    {/* Full screen */}
-                    <button
-                      type="button"
-                      aria-label={isFullScreen ? "Exit full screen" : "Full screen"}
-                      title={isFullScreen ? "Exit full screen" : "Full screen"}
-                      aria-pressed={isFullScreen}
-                      onClick={() => setIsFullScreen((current) => !current)}
-                      className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] p-2"
-                    >
-                      {isFullScreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                    </button>
-                  </>
-                )}
-
-                {/* View settings remains visible in both states */}
-                <button
-                  type="button"
-                  aria-label="Toggle display density"
-                  title={`Density: ${viewConfig.density}`}
-                  onClick={() =>
-                    setViewConfig((current) => ({
-                      ...current,
-                      density:
-                        current.density === savedBaseline.density
-                          ? current.density === "Compact"
-                            ? "Comfortable"
-                            : "Compact"
-                          : savedBaseline.density,
-                    }))
-                  }
-                  className={`cursor-pointer rounded-md border p-2 ${
-                    viewConfig.density !== savedBaseline.density
-                      ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)]"
-                      : "border-[var(--zb-grid-rule)]"
-                  }`}
-                >
-                  <SlidersHorizontal size={15} />
-                </button>
-
-                {/* Show criteria remains visible in both states */}
-                <button
-                  type="button"
-                  aria-label={criteriaVisible ? "Hide criteria" : "Show criteria"}
-                  title={criteriaVisible ? "Hide criteria" : "Show criteria"}
-                  onClick={criteriaVisible ? handleHideCriteria : handleShowCriteria}
-                  className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)] p-2"
-                >
-                  {criteriaVisible ? (
-                    <ChevronDown size={15} aria-hidden="true" />
-                  ) : (
-                    <ChevronUp size={15} aria-hidden="true" />
+                    </>
                   )}
-                </button>
+
+                  {/* View settings remains visible in both states */}
+                  <button
+                    type="button"
+                    aria-label="Toggle display density"
+                    title={`Density: ${viewConfig.density}`}
+                    onClick={() =>
+                      setViewConfig((current) => ({
+                        ...current,
+                        density:
+                          current.density === savedBaseline.density
+                            ? current.density === "Compact"
+                              ? "Comfortable"
+                              : "Compact"
+                            : savedBaseline.density,
+                      }))
+                    }
+                    className={`cursor-pointer rounded-md border p-2 ${
+                      viewConfig.density !== savedBaseline.density
+                        ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)]"
+                        : "border-[var(--zb-grid-rule)]"
+                    }`}
+                  >
+                    <SlidersHorizontal size={15} />
+                  </button>
+
+                  {/* Show criteria remains visible in both states */}
+                  <button
+                    type="button"
+                    aria-label={criteriaVisible ? "Hide criteria" : "Show criteria"}
+                    title={criteriaVisible ? "Hide criteria" : "Show criteria"}
+                    onClick={criteriaVisible ? handleHideCriteria : handleShowCriteria}
+                    className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--zb-grid-rule)] p-2"
+                  >
+                    {criteriaVisible ? (
+                      <ChevronDown size={15} aria-hidden="true" />
+                    ) : (
+                      <ChevronUp size={15} aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           }
@@ -2335,7 +2365,13 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
           }
           criteria={
             criteriaVisible ? (
-              <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div
+                className={
+                  isFullScreen
+                    ? "flex flex-wrap items-center gap-2 text-xs"
+                    : "flex w-full flex-nowrap items-center gap-2 overflow-x-auto text-xs [&>*]:shrink-0"
+                }
+              >
                 {group ? (
                   <button
                     type="button"
