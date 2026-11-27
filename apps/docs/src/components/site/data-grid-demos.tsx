@@ -27,6 +27,7 @@ import {
   Minimize2,
   Search,
   SlidersHorizontal,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -37,6 +38,8 @@ import {
   type DataGridColumnPinning,
   type GridSort,
 } from "@/registry/zoblocks/data-grid/data-grid";
+import { DateRangeField } from "@/registry/zoblocks/date-picker/date-picker";
+import { compareDates, plainDate, type ZbDate } from "@/lib/zoblocks-datetime";
 import {
   ARRIVALS,
   CASELOAD,
@@ -57,6 +60,10 @@ type FilterFieldKey = "status" | "phq9" | "program" | "cssrs" | "risk" | "due";
 type FilterCondition = {
   id: string;
   field: FilterFieldKey;
+  operator?: "is" | "is-any-of" | "greater-than-or-equal" | "date-range";
+  value?: string[];
+  numericValue?: string;
+  dateRange?: { start: ZbDate | null; end: ZbDate | null };
 };
 
 type FilterUsage = {
@@ -72,6 +79,15 @@ const FILTER_FIELDS: readonly { key: FilterFieldKey; label: string }[] = [
   { key: "risk", label: "Disengagement" },
   { key: "due", label: "Next Contact" },
 ];
+
+const STATUS_FILTER_VALUES = [
+  "Active",
+  "Pending",
+  "On hold",
+  "Completed",
+  "Inactive",
+  "Archived",
+] as const;
 
 const INITIAL_SIMPLE_CONDITIONS: readonly FilterCondition[] = [
   { id: "simple-status", field: "status" },
@@ -576,14 +592,23 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
 
   const [simplePickerOpen, setSimplePickerOpen] = React.useState(false);
   const [activeSimpleConditionId, setActiveSimpleConditionId] = React.useState<string | null>(null);
+  const [statusValuePickerOpen, setStatusValuePickerOpen] = React.useState(false);
+  const [simpleFilterUndo, setSimpleFilterUndo] = React.useState<FilterCondition | null>(null);
+  const [simpleFilterPendingClear, setSimpleFilterPendingClear] =
+    React.useState<FilterCondition | null>(null);
   const [advancedPickerConditionId, setAdvancedPickerConditionId] = React.useState<string | null>(
     null,
   );
   const [advancedEditorOpen, setAdvancedEditorOpen] = React.useState(false);
+  const [pendingAdvancedSimpleTransfer, setPendingAdvancedSimpleTransfer] = React.useState<{
+    simpleConditionId: string;
+    advancedConditionId: string;
+    sourceWasCommitted: boolean;
+  } | null>(null);
 
   // The pending action determines what happens after confirmation.
   const [pendingExit, setPendingExit] = React.useState<
-    "hide" | "cancel" | "view" | "filter" | "sort" | null
+    "hide" | "cancel" | "simple-cancel" | "simple-sort" | "view" | "filter" | "sort" | null
   >(null);
   const [pendingView, setPendingView] = React.useState<SavedViewName | null>(null);
   const [pendingSortAction, setPendingSortAction] = React.useState<{
@@ -601,6 +626,23 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
   const keepEditingRef = React.useRef<HTMLButtonElement>(null);
   const discardChangesRef = React.useRef<HTMLButtonElement>(null);
   const exitTriggerRef = React.useRef<HTMLElement | null>(null);
+  const statusValuePickerRef = React.useRef<HTMLDivElement>(null);
+  const advancedConditionStackRef = React.useRef<HTMLDivElement>(null);
+  const previousAdvancedConditionCountRef = React.useRef(draftAdvancedConditions.length);
+
+  React.useEffect(() => {
+    const previousCount = previousAdvancedConditionCountRef.current;
+    const currentCount = draftAdvancedConditions.length;
+
+    previousAdvancedConditionCountRef.current = currentCount;
+
+    if (advancedEditorOpen && currentCount > previousCount) {
+      const stack = advancedConditionStackRef.current;
+      if (stack) {
+        stack.scrollTop = stack.scrollHeight;
+      }
+    }
+  }, [advancedEditorOpen, draftAdvancedConditions.length]);
   const sortButtonRef = React.useRef<HTMLButtonElement>(null);
   const riskScreenValueRef = React.useRef<HTMLSelectElement>(null);
   const manageColumnsTriggerRef = React.useRef<HTMLButtonElement>(null);
@@ -625,12 +667,49 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
 
   const draftModified = JSON.stringify(draftSort) !== JSON.stringify(committedSort);
 
+  const simpleDraftModified =
+    JSON.stringify(draftSimpleConditions) !== JSON.stringify(committedSimpleConditions);
+
+  const activeSimpleCondition = draftSimpleConditions.find(
+    (condition) => condition.id === activeSimpleConditionId,
+  );
+
+  const simpleDraftValid = Boolean(
+    activeSimpleCondition &&
+    (activeSimpleCondition.field === "status"
+      ? (activeSimpleCondition.value?.length ?? 0) > 0
+      : activeSimpleCondition.field === "phq9"
+        ? activeSimpleCondition.numericValue?.trim() !== "" &&
+          activeSimpleCondition.numericValue !== undefined &&
+          Number.isFinite(Number(activeSimpleCondition.numericValue))
+        : activeSimpleCondition.field === "due"
+          ? activeSimpleCondition.operator === "date-range" &&
+            activeSimpleCondition.dateRange?.start !== null &&
+            activeSimpleCondition.dateRange?.start !== undefined &&
+            activeSimpleCondition.dateRange?.end !== null &&
+            activeSimpleCondition.dateRange?.end !== undefined &&
+            compareDates(
+              activeSimpleCondition.dateRange.end,
+              activeSimpleCondition.dateRange.start,
+            ) >= 0
+          : true),
+  );
+
   const filterUsage = getFilterUsage(committedSimpleConditions, committedAdvancedConditions);
 
   const openSimpleFieldPicker = () => {
     setDraftSimpleConditions([...committedSimpleConditions]);
     setActiveSimpleConditionId(null);
     setSimplePickerOpen(true);
+    setCriteriaVisible(true);
+  };
+
+  const openSimpleFilterEditor = (conditionId: string) => {
+    setSimpleFilterPendingClear(null);
+    setDraftSimpleConditions([...committedSimpleConditions]);
+    setActiveSimpleConditionId(conditionId);
+    setSimplePickerOpen(true);
+    setStatusValuePickerOpen(false);
     setCriteriaVisible(true);
   };
 
@@ -645,13 +724,40 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
     const existing = draftSimpleConditions.find((condition) => condition.field === field);
 
     if (existing) {
-      // Simple fields are unique: select the existing condition for editing.
+      setDraftSimpleConditions((current) =>
+        current.map((condition) =>
+          condition.id === existing.id
+            ? {
+                ...condition,
+                ...(field === "status" ? { operator: condition.operator ?? "is" } : {}),
+                ...(field === "phq9"
+                  ? {
+                      operator: condition.operator ?? "greater-than-or-equal",
+                    }
+                  : {}),
+              }
+            : condition,
+        ),
+      );
+
+      setStatusValuePickerOpen(field === "status");
       setActiveSimpleConditionId(existing.id);
       return;
     }
 
     const id = `simple-${field}`;
-    setDraftSimpleConditions((current) => [...current, { id, field }]);
+    setDraftSimpleConditions((current) => [
+      ...current,
+      {
+        id,
+        field,
+        ...(field === "status" ? { operator: "is" as const } : {}),
+        ...(field === "phq9"
+          ? { operator: "greater-than-or-equal" as const, numericValue: "" }
+          : {}),
+      },
+    ]);
+    setStatusValuePickerOpen(field === "status");
     setActiveSimpleConditionId(id);
   };
 
@@ -670,16 +776,137 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
     );
   };
 
+  const selectStatusValue = (value: string) => {
+    if (!activeSimpleConditionId) return;
+
+    setDraftSimpleConditions((current) =>
+      current.map((condition) => {
+        if (condition.id !== activeSimpleConditionId) return condition;
+
+        const selectedValues = condition.value ?? [];
+        const nextValues = selectedValues.includes(value)
+          ? selectedValues.filter((item) => item !== value)
+          : [...selectedValues, value];
+
+        return {
+          ...condition,
+          value: nextValues,
+          operator: nextValues.length > 1 ? "is-any-of" : "is",
+        };
+      }),
+    );
+  };
+
+  const selectAllStatusValues = () => {
+    if (!activeSimpleConditionId) return;
+
+    setDraftSimpleConditions((current) =>
+      current.map((condition) =>
+        condition.id === activeSimpleConditionId
+          ? {
+              ...condition,
+              value:
+                condition.value?.length === STATUS_FILTER_VALUES.length
+                  ? []
+                  : [...STATUS_FILTER_VALUES],
+            }
+          : condition,
+      ),
+    );
+  };
+
   const applySimpleConditions = () => {
     setCommittedSimpleConditions([...draftSimpleConditions]);
     setSimplePickerOpen(false);
+    setStatusValuePickerOpen(false);
+    setActiveSimpleConditionId(null);
+  };
+
+  const clearSimpleFilter = () => {
+    if (!simpleFilterPendingClear) return;
+
+    setSimpleFilterUndo(simpleFilterPendingClear);
+    setCommittedSimpleConditions((current) =>
+      current.filter((condition) => condition.id !== simpleFilterPendingClear.id),
+    );
+    setDraftSimpleConditions((current) =>
+      current.filter((condition) => condition.id !== simpleFilterPendingClear.id),
+    );
+    setSimpleFilterPendingClear(null);
+    setSimplePickerOpen(false);
+    setStatusValuePickerOpen(false);
+    setActiveSimpleConditionId(null);
+  };
+
+  const undoSimpleFilterClear = () => {
+    if (!simpleFilterUndo) return;
+
+    setCommittedSimpleConditions((current) => [...current, simpleFilterUndo]);
+    setDraftSimpleConditions((current) => [...current, simpleFilterUndo]);
+    setSimpleFilterUndo(null);
+  };
+
+  const handleCancelSimpleFilter = () => {
+    if (simpleDraftModified) {
+      exitTriggerRef.current = document.activeElement as HTMLElement;
+      setPendingExit("simple-cancel");
+      return;
+    }
+
+    setDraftSimpleConditions([...committedSimpleConditions]);
+    setSimplePickerOpen(false);
+    setStatusValuePickerOpen(false);
     setActiveSimpleConditionId(null);
   };
 
   const applyAdvancedConditions = () => {
     setCommittedAdvancedConditions([...draftAdvancedConditions]);
+
+    if (
+      pendingAdvancedSimpleTransfer &&
+      draftAdvancedConditions.some(
+        (condition) => condition.id === pendingAdvancedSimpleTransfer.advancedConditionId,
+      )
+    ) {
+      setDraftSimpleConditions((current) =>
+        current.filter(
+          (condition) => condition.id !== pendingAdvancedSimpleTransfer.simpleConditionId,
+        ),
+      );
+
+      if (pendingAdvancedSimpleTransfer.sourceWasCommitted) {
+        setCommittedSimpleConditions((current) =>
+          current.filter(
+            (condition) => condition.id !== pendingAdvancedSimpleTransfer.simpleConditionId,
+          ),
+        );
+      }
+    }
+
+    setPendingAdvancedSimpleTransfer(null);
     setAdvancedPickerConditionId(null);
     setAdvancedEditorOpen(false);
+  };
+
+  const addSimpleConditionToAdvanced = () => {
+    if (!activeSimpleCondition || !simpleDraftValid) return;
+
+    const id = `advanced-from-simple-${Date.now()}`;
+    const sourceWasCommitted = committedSimpleConditions.some(
+      (condition) => condition.id === activeSimpleCondition.id,
+    );
+
+    setDraftAdvancedConditions([...committedAdvancedConditions, { ...activeSimpleCondition, id }]);
+    setPendingAdvancedSimpleTransfer({
+      simpleConditionId: activeSimpleCondition.id,
+      advancedConditionId: id,
+      sourceWasCommitted,
+    });
+    setAdvancedPickerConditionId(null);
+    setAdvancedEditorOpen(true);
+    setSimplePickerOpen(false);
+    setStatusValuePickerOpen(false);
+    setActiveSimpleConditionId(null);
   };
 
   const getPrimarySort = (rules: readonly string[]): GridSort | null => {
@@ -805,6 +1032,24 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
       riskScreenValueRef.current?.focus();
     }
   }, [riskScreenEditorOpen]);
+
+  React.useEffect(() => {
+    if (!statusValuePickerOpen) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (statusValuePickerRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
+      setStatusValuePickerOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+    };
+  }, [statusValuePickerOpen]);
 
   React.useEffect(() => {
     if (manageColumnsOpen) {
@@ -1045,6 +1290,12 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
   };
 
   const handleOpenEditor = () => {
+    if (simplePickerOpen && simpleDraftModified) {
+      exitTriggerRef.current = document.activeElement as HTMLElement;
+      setPendingExit("simple-sort");
+      return;
+    }
+
     setCriteriaVisible(true);
     setDraftSort([...committedSort]);
     setEditorOpen(true);
@@ -1054,7 +1305,11 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
     const riskScreenDraftModified =
       riskScreenEditorOpen && draftRiskScreenValue !== committedRiskScreenValue;
 
-    if ((editorOpen && draftModified) || riskScreenDraftModified) {
+    if (
+      (editorOpen && draftModified) ||
+      riskScreenDraftModified ||
+      (simplePickerOpen && simpleDraftModified)
+    ) {
       exitTriggerRef.current = document.activeElement as HTMLElement;
       setPendingExit("hide");
       return;
@@ -1062,6 +1317,11 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
 
     setEditorOpen(false);
     setRiskScreenEditorOpen(false);
+    setDraftRiskScreenValue(committedRiskScreenValue);
+    setDraftSimpleConditions([...committedSimpleConditions]);
+    setSimplePickerOpen(false);
+    setStatusValuePickerOpen(false);
+    setActiveSimpleConditionId(null);
     setCriteriaVisible(false);
   };
 
@@ -1115,9 +1375,28 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
       setEditorOpen(false);
       setRiskScreenEditorOpen(false);
       setDraftRiskScreenValue(committedRiskScreenValue);
+      setDraftSimpleConditions([...committedSimpleConditions]);
+      setSimplePickerOpen(false);
+      setStatusValuePickerOpen(false);
+      setActiveSimpleConditionId(null);
       setCriteriaVisible(false);
     } else if (exitAction === "cancel") {
       setEditorOpen(false);
+    } else if (exitAction === "simple-cancel") {
+      setDraftSimpleConditions([...committedSimpleConditions]);
+      setSimpleFilterPendingClear(null);
+      setSimplePickerOpen(false);
+      setStatusValuePickerOpen(false);
+      setActiveSimpleConditionId(null);
+    } else if (exitAction === "simple-sort") {
+      setDraftSimpleConditions([...committedSimpleConditions]);
+      setSimpleFilterPendingClear(null);
+      setSimplePickerOpen(false);
+      setStatusValuePickerOpen(false);
+      setActiveSimpleConditionId(null);
+      setCriteriaVisible(true);
+      setDraftSort([...committedSort]);
+      setEditorOpen(true);
     } else if (exitAction === "filter") {
       setEditorOpen(false);
       setCriteriaVisible(true);
@@ -1504,18 +1783,10 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                       <button
                         type="button"
                         aria-label="Filter"
-                        title="Toggle filter"
-                        onClick={() =>
-                          setViewConfig((current) => ({
-                            ...current,
-                            filter:
-                              current.filter === savedBaseline.filter
-                                ? "Changed filter"
-                                : savedBaseline.filter,
-                          }))
-                        }
+                        title="Add filter"
+                        onClick={openSimpleFieldPicker}
                         className={`cursor-pointer rounded-md border p-2 ${
-                          viewConfig.filter !== savedBaseline.filter
+                          simplePickerOpen
                             ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)]"
                             : "border-[var(--zb-grid-rule)]"
                         }`}
@@ -2076,23 +2347,39 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                       <div className="flex gap-2 text-xs">
                         <button
                           type="button"
-                          onClick={() => {
-                            setDraftSimpleConditions([...committedSimpleConditions]);
-                            setSimplePickerOpen(false);
-                            setActiveSimpleConditionId(null);
-                          }}
+                          onClick={handleCancelSimpleFilter}
                           className="cursor-pointer rounded-md px-3 py-1.5 text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-sunk)]"
                         >
                           Cancel
                         </button>
                         <button
                           type="button"
-                          disabled={!activeSimpleConditionId}
-                          onClick={applySimpleConditions}
-                          className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={!simpleDraftValid}
+                          onClick={addSimpleConditionToAdvanced}
+                          className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] px-3 py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Apply
+                          {committedAdvancedConditions.length === 0
+                            ? "Convert to Advanced Filter"
+                            : "Add to Advanced Filter"}
                         </button>
+                        {simpleFilterPendingClear ? (
+                          <button
+                            type="button"
+                            onClick={clearSimpleFilter}
+                            className="cursor-pointer rounded-md border border-red-300 bg-red-50 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-100"
+                          >
+                            Clear filter
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!simpleDraftValid || !simpleDraftModified}
+                            onClick={applySimpleConditions}
+                            className="cursor-pointer rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-1.5 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Apply
+                          </button>
+                        )}
                       </div>
                     </div>
                     <FilterFieldPicker
@@ -2105,6 +2392,262 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                       usage={filterUsage}
                       onSelect={selectSimpleField}
                     />
+
+                    {activeSimpleCondition?.field === "status" ? (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto] sm:items-end">
+                        <div className="grid min-w-0 gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">Field</span>
+                          <div className="rounded-md border px-3 py-2 text-sm">Status</div>
+                        </div>
+
+                        <div className="grid min-w-0 gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Operator
+                          </span>
+                          <div className="rounded-md border px-3 py-2 text-sm">
+                            {activeSimpleCondition.operator === "is-any-of"
+                              ? "is any of (illustrative)"
+                              : "is"}
+                          </div>
+                        </div>
+
+                        <div className="grid min-w-0 gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">Value</span>
+                          <div ref={statusValuePickerRef} className="relative min-w-0">
+                            <button
+                              type="button"
+                              className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm"
+                              aria-expanded={statusValuePickerOpen}
+                              onClick={() => setStatusValuePickerOpen((open) => !open)}
+                            >
+                              <span className="truncate">
+                                {activeSimpleCondition.value?.length
+                                  ? activeSimpleCondition.value.join(", ")
+                                  : "Select a value"}
+                              </span>
+                              <span aria-hidden="true">⌄</span>
+                            </button>
+
+                            {statusValuePickerOpen ? (
+                              <div className="absolute left-0 top-full z-20 mt-1 w-full rounded-md border bg-paper p-2 text-ink shadow-md">
+                                <div className="flex items-center justify-between px-2 py-2">
+                                  <span className="text-sm font-medium">Statuses</span>
+                                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        activeSimpleCondition.value?.length ===
+                                        STATUS_FILTER_VALUES.length
+                                      }
+                                      onChange={selectAllStatusValues}
+                                    />
+                                    Select all
+                                  </label>
+                                </div>
+
+                                {STATUS_FILTER_VALUES.map((value) => (
+                                  <label
+                                    key={value}
+                                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-sm hover:bg-muted"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        activeSimpleCondition.value?.includes(value) ?? false
+                                      }
+                                      onChange={() => selectStatusValue(value)}
+                                    />
+                                    {value}
+                                  </label>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end sm:pb-0.5">
+                          <button
+                            type="button"
+                            aria-label={`Delete ${activeSimpleCondition.field} filter`}
+                            title="Delete filter"
+                            onClick={() => {
+                              const committedCondition = committedSimpleConditions.find(
+                                (condition) => condition.id === activeSimpleCondition.id,
+                              );
+
+                              setSimpleFilterPendingClear(
+                                committedCondition && (committedCondition.value?.length ?? 0) > 0
+                                  ? committedCondition
+                                  : null,
+                              );
+
+                              setDraftSimpleConditions([
+                                {
+                                  id: activeSimpleCondition.id,
+                                  field: "status",
+                                },
+                              ]);
+                              setActiveSimpleConditionId(null);
+                              setStatusValuePickerOpen(false);
+                            }}
+                            className="inline-flex size-9 cursor-pointer items-center justify-center rounded-md border text-[var(--zb-grid-muted)] hover:bg-muted hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {activeSimpleCondition?.field === "phq9" ? (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1fr)_auto] sm:items-start">
+                        <label className="grid min-w-0 gap-1 text-xs">
+                          <span className="font-medium text-muted-foreground">Field</span>
+                          <input
+                            aria-label="Filter field"
+                            value="PHQ-9"
+                            readOnly
+                            className="rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-2 text-sm"
+                          />
+                        </label>
+
+                        <label className="grid min-w-0 gap-1 text-xs">
+                          <span className="font-medium text-muted-foreground">Operator</span>
+                          <input
+                            aria-label="Filter operator"
+                            value="Greater than or equal to (≥)"
+                            readOnly
+                            className="rounded-md border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-3 py-2 text-sm"
+                          />
+                          <span className="text-[var(--zb-grid-muted)]">
+                            Illustrative operator — awaiting specification confirmation
+                          </span>
+                        </label>
+
+                        <label className="grid min-w-0 gap-1 text-xs">
+                          <span className="font-medium text-muted-foreground">Value</span>
+                          <input
+                            type="number"
+                            aria-label="PHQ-9 numeric value"
+                            value={activeSimpleCondition.numericValue ?? ""}
+                            onChange={(event) => {
+                              setDraftSimpleConditions((current) =>
+                                current.map((condition) =>
+                                  condition.id === activeSimpleCondition.id
+                                    ? { ...condition, numericValue: event.target.value }
+                                    : condition,
+                                ),
+                              );
+                            }}
+                            placeholder="Enter a number"
+                            className="w-full rounded-md border border-[var(--zb-grid-rule)] bg-paper px-3 py-2 text-sm text-ink"
+                          />
+                        </label>
+
+                        <div className="flex justify-end sm:pb-0.5">
+                          <button
+                            type="button"
+                            aria-label="Delete PHQ-9 filter"
+                            title="Delete filter"
+                            onClick={() => {
+                              setDraftSimpleConditions((current) =>
+                                current.filter(
+                                  (condition) => condition.id !== activeSimpleCondition.id,
+                                ),
+                              );
+                              setActiveSimpleConditionId(null);
+                            }}
+                            className="inline-flex size-9 cursor-pointer items-center justify-center rounded-md border text-[var(--zb-grid-muted)] hover:bg-muted hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {activeSimpleCondition?.field === "due" ? (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_auto] sm:items-end">
+                        <div className="grid min-w-0 gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">Field</span>
+                          <div className="rounded-md border px-3 py-2 text-sm">Next Contact</div>
+                        </div>
+
+                        <div className="grid min-w-0 gap-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Date selection
+                          </span>
+                          <button
+                            type="button"
+                            aria-pressed={activeSimpleCondition.operator === "date-range"}
+                            onClick={() => {
+                              setDraftSimpleConditions((current) =>
+                                current.map((condition) =>
+                                  condition.id === activeSimpleCondition.id
+                                    ? {
+                                        ...condition,
+                                        operator: "date-range",
+                                        dateRange: condition.dateRange ?? {
+                                          start: null,
+                                          end: null,
+                                        },
+                                      }
+                                    : condition,
+                                ),
+                              );
+                            }}
+                            className="rounded-md border border-[var(--zb-grid-rule)] px-3 py-2 text-left text-sm hover:bg-[var(--zb-grid-sunk)]"
+                          >
+                            Date range
+                          </button>
+                        </div>
+
+                        <div className="flex justify-end sm:pb-0.5">
+                          <button
+                            type="button"
+                            aria-label="Delete Next Contact filter"
+                            title="Delete filter"
+                            onClick={() => {
+                              setDraftSimpleConditions((current) =>
+                                current.filter(
+                                  (condition) => condition.id !== activeSimpleCondition.id,
+                                ),
+                              );
+                              setActiveSimpleConditionId(null);
+                            }}
+                            className="inline-flex size-9 cursor-pointer items-center justify-center rounded-md border text-[var(--zb-grid-muted)] hover:bg-muted hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </button>
+                        </div>
+
+                        {activeSimpleCondition.operator === "date-range" ? (
+                          <div className="min-w-0 sm:col-start-2 sm:max-w-[420px]">
+                            <DateRangeField
+                              label="Next Contact date range"
+                              startLabel="Start date"
+                              endLabel="End date"
+                              now={plainDate(2026, 10, 1)}
+                              commit="explicit"
+                              value={
+                                activeSimpleCondition.dateRange ?? {
+                                  start: null,
+                                  end: null,
+                                }
+                              }
+                              onChange={(dateRange) => {
+                                setDraftSimpleConditions((current) =>
+                                  current.map((condition) =>
+                                    condition.id === activeSimpleCondition.id
+                                      ? { ...condition, dateRange }
+                                      : condition,
+                                  ),
+                                );
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
                     {activeSimpleConditionId ? (
                       <p className="mt-2 text-xs text-[var(--zb-grid-muted)]">
                         {
@@ -2122,6 +2665,33 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                   </div>
                 ) : null}
 
+                {simpleFilterUndo ? (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--zb-grid-rule)] bg-[var(--zb-grid-sunk)] px-4 py-3 text-sm"
+                  >
+                    <span>Simple filter cleared.</span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={undoSimpleFilterClear}
+                        className="cursor-pointer font-semibold text-[var(--zb-grid-ink)] hover:underline"
+                      >
+                        Undo
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Close notification"
+                        onClick={() => setSimpleFilterUndo(null)}
+                        className="cursor-pointer text-[var(--zb-grid-muted)] hover:text-[var(--zb-grid-ink)]"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
                 {advancedEditorOpen ? (
                   <div className="rounded-lg border border-[var(--zb-grid-rule)] p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2132,6 +2702,7 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                           onClick={() => {
                             setDraftAdvancedConditions([...committedAdvancedConditions]);
                             setAdvancedPickerConditionId(null);
+                            setPendingAdvancedSimpleTransfer(null);
                             setAdvancedEditorOpen(false);
                           }}
                           className="cursor-pointer rounded-md px-3 py-1.5 text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-sunk)]"
@@ -2148,7 +2719,10 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                       </div>
                     </div>
 
-                    <div className="mt-3 grid gap-2">
+                    <div
+                      ref={advancedConditionStackRef}
+                      className="mt-3 grid max-h-64 gap-2 overflow-y-auto"
+                    >
                       {draftAdvancedConditions.map((condition, index) => {
                         const field = FILTER_FIELDS.find((item) => item.key === condition.field);
 
@@ -2168,9 +2742,32 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                               className="min-w-0 flex-1 rounded-md border border-[var(--zb-grid-rule)] bg-paper px-3 py-2 text-left text-sm text-ink hover:opacity-80"
                             >
                               <span className="break-words">{field?.label ?? condition.field}</span>
+                              {condition.operator === "is" ? (
+                                <span className="ml-2 text-sm text-[var(--zb-grid-ink)]">Is</span>
+                              ) : null}
+                              {condition.value?.length ? (
+                                <span className="ml-2 text-sm font-medium text-[var(--zb-grid-ink)]">
+                                  {condition.value.join(", ")}
+                                </span>
+                              ) : null}
                               <span className="ml-2 text-xs text-[var(--zb-grid-muted)]">
                                 Change field
                               </span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Remove condition ${index + 1}`}
+                              onClick={() => {
+                                setDraftAdvancedConditions((current) =>
+                                  current.filter((item) => item.id !== condition.id),
+                                );
+                                if (advancedPickerConditionId === condition.id) {
+                                  setAdvancedPickerConditionId(null);
+                                }
+                              }}
+                              className="rounded-md border border-[var(--zb-grid-rule)] px-3 py-2 text-sm text-[var(--zb-grid-muted)] hover:bg-[var(--zb-grid-hover)]"
+                            >
+                              Remove
                             </button>
                           </div>
                         );
@@ -2418,13 +3015,15 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                 >
                   Sort: {committedSort.length} {committedSort.length === 1 ? "field" : "fields"}
                 </button>
-                <button
-                  type="button"
-                  onClick={openAdvancedEditor}
-                  className="cursor-pointer rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2 hover:opacity-80"
-                >
-                  Advanced filter: {committedAdvancedConditions.length} rules
-                </button>
+                {committedAdvancedConditions.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={openAdvancedEditor}
+                    className="cursor-pointer rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2 hover:opacity-80"
+                  >
+                    Advanced filter: {committedAdvancedConditions.length} rules
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={openSimpleFieldPicker}
@@ -2435,6 +3034,28 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                 <span className="rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2">
                   Status: Archived
                 </span>
+                {committedSimpleConditions
+                  .filter(
+                    (condition) =>
+                      condition.field === "status" && (condition.value?.length ?? 0) > 0,
+                  )
+                  .map((condition) => (
+                    <button
+                      key={condition.id}
+                      type="button"
+                      aria-label={`Edit Status filter: ${condition.value?.join(", ")}`}
+                      onClick={() => openSimpleFilterEditor(condition.id)}
+                      className={`cursor-pointer rounded-full border px-3 py-1 text-xs transition-colors ${
+                        simplePickerOpen &&
+                        (activeSimpleConditionId === condition.id ||
+                          simpleFilterPendingClear?.id === condition.id)
+                          ? "border-[var(--zb-grid-ink)] bg-[var(--zb-grid-sunk)] font-semibold"
+                          : "border-[var(--zb-grid-ink)] hover:bg-[var(--zb-grid-sunk)]"
+                      }`}
+                    >
+                      Status: {condition.value?.join(", ")}
+                    </button>
+                  ))}
                 {committedRiskScreenValue && (
                   <span className="rounded-md bg-[var(--zb-grid-sunk)] px-3 py-2">
                     Risk Screen: {committedRiskScreenValue}
@@ -2563,7 +3184,11 @@ export function DataGridPlayground(props: DataGridPlaygroundProps) {
                           ? "your unsaved Sort changes"
                           : "your unsaved view settings"
                     }. Do you want to continue?`
-                  : "You have unsaved Sort changes. Do you want to discard them?"}
+                  : pendingExit === "hide" && simplePickerOpen && simpleDraftModified
+                    ? "Hiding Criteria Summary will discard your unsaved Simple Filter changes. Do you want to continue?"
+                    : pendingExit === "simple-cancel"
+                      ? "You have unsaved Simple Filter changes. Do you want to discard them?"
+                      : "You have unsaved Sort changes. Do you want to discard them?"}
             </p>
 
             <div className="mt-5 flex justify-end gap-2">
